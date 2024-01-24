@@ -1,0 +1,30 @@
+[Bb]uild/
+
+#Compiled Object Files
+*.slo
+*.lo
+*.o
+*.obj
+
+#Precompiled Headers
+*.gch
+*.pch
+
+#Compiled Dynamic Libraries
+*.so
+*.dll
+
+#Compiled Static Libraries
+*.a
+*.lib
+
+#Libtool
+*.lai 
+*.la
+
+#Executable
+*.exe
+*.out
+
+#Makefile
+*.d
