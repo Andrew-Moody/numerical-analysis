@@ -28,3 +28,6 @@
 
 #Makefile
 *.d
+
+#VSCODE
+.vscode/
