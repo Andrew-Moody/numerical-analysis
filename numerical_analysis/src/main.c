@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include <omp.h>
 
+#include "fluid.h"
+
 int main(void)
 {
     int chunk = 1;
@@ -16,7 +18,7 @@ int main(void)
 
     double startTime = omp_get_wtime();
 
-    #pragma omp parallel shared(array) num_threads(8)
+    /* #pragma omp parallel shared(array) num_threads(8)
     {
         #pragma omp single 
         printf("Number of threads: %d\n", omp_get_num_threads());
@@ -34,18 +36,13 @@ int main(void)
             }
             array[i] = (float)i * (2.0f * total / (float)n / (float)(n-1));
         }
+    } */
 
-        
-    }
+    linearConvection1D();
 
     double endTime = omp_get_wtime();
 
-    printf("%f\n", array[size - 1]);
-
-    /* for(int i = 0; i < size; ++i)
-    {
-        printf("%f\n", array[i]);
-    } */
+    //printf("%f\n", array[size - 1]);
 
     printf("Time: %f\n", endTime - startTime);
 
