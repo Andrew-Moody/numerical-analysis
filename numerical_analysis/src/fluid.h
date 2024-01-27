@@ -3,6 +3,8 @@
 
 #include <stdio.h>
 
-void convection1D(void);
+void finiteDifference1D(void);
+
+void finiteDifference2D(void);
 
 #endif
