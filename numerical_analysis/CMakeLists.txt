@@ -1,11 +1,19 @@
-cmake_minimum_required(VERSION 3.22)
-
-project(numerical_analysis VERSION 1.0 LANGUAGES C)
+cmake_minimum_required(VERSION 3.13)
 
 find_package(OpenMP REQUIRED)
 
-add_executable(${PROJECT_NAME}
-    src/main.c
-    src/fluid.c)
+add_executable(fluid_analysis "")
 
-target_link_libraries(${PROJECT_NAME} PRIVATE OpenMP::OpenMP_C)
+target_sources(fluid_analysis
+    PRIVATE
+        src/main.c
+        src/fluid.h
+        src/fluid.c
+)
+
+add_subdirectory(src/graphics)
+
+target_link_libraries(fluid_analysis
+    PRIVATE 
+        OpenMP::OpenMP_C
+)
