@@ -100,6 +100,96 @@ int graphics_test(void)
     // bind the vao again before drawing
     glBindVertexArray(0);
 
+
+    // Create a grid of quads
+    int x_steps = 25;
+    int y_steps = 25;
+
+    int grid_size = 3 * (x_steps + 1) * (y_steps + 1);
+
+    float *grid = (float *)malloc(grid_size * sizeof(float));
+
+    if (!grid)
+    {
+        return -1;
+    }
+
+    // Set vertices
+    for (int j = 0; j <= y_steps; ++j)
+    {
+        for (int i = 0; i <= x_steps; ++i)
+        {
+            int index = 3 * (i + j * (x_steps + 1));
+
+            grid[index] = -0.5f + (float)i / x_steps;
+            grid[index + 1] = -0.5f + (float)j / y_steps;
+            grid[index + 2] = 0.0f;
+        }
+    }
+
+    int indices_size = 6 * x_steps * y_steps;
+
+    unsigned int *grid_indices = (unsigned int *)malloc(indices_size * sizeof(unsigned int));
+
+    if (!grid_indices)
+    {
+        return -1;
+    }
+
+    // Set indices
+    for (int j = 0; j < y_steps; ++j)
+    {
+        for (int i = 0; i < x_steps; ++i)
+        {
+            int triangle_idx = 6 * (i + j * x_steps);
+
+            int v1 = (i + j * (y_steps + 1));
+            int v2 = v1 + 1;
+            int v3 = (i + (j + 1) * (y_steps + 1));
+            int v4 = v3 + 1;
+
+            if (triangle_idx + 2 >= indices_size)
+            {
+                return -1;
+            }
+
+            // Note winding order
+
+            grid_indices[triangle_idx] = v1;
+            grid_indices[triangle_idx + 1] = v2;
+            grid_indices[triangle_idx + 2] = v3;
+
+            grid_indices[triangle_idx + 3] = v2;
+            grid_indices[triangle_idx + 4] = v4;
+            grid_indices[triangle_idx + 5] = v3;
+        }
+    }
+
+    GLuint grid_vao;
+    glGenVertexArrays(1, &grid_vao);
+    glBindVertexArray(grid_vao);
+
+    GLuint grid_vbo;
+    glGenBuffers(1, &grid_vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, grid_vbo);
+    glBufferData(GL_ARRAY_BUFFER, grid_size * sizeof(float), grid, GL_STATIC_DRAW);
+
+    GLuint grid_ebo;
+    glGenBuffers(1, &grid_ebo);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, grid_ebo);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices_size * sizeof(unsigned int), grid_indices, GL_STATIC_DRAW);
+
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void *)0);
+    glEnableVertexAttribArray(0);
+
+    glBindVertexArray(0);
+
+    free(grid);
+    free(grid_indices);
+
+    grid = NULL;
+    grid_indices = NULL;
+
     // Basic vertex shader
     const char *vertexShaderSource = "#version 420 core\n"
                                      "layout (location = 0) in vec3 aPos;\n"
@@ -161,6 +251,12 @@ int graphics_test(void)
     // Rendering calls will now use our own shader
     glUseProgram(shaderProgram);
 
+    glEnable(GL_CULL_FACE); // Enable back face culling
+
+    //glPolygonMode(GL_FRONT_AND_BACK, GL_FILL); // Default
+
+    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
     // Process Input and Rendering commands until a close event is recieved
     while (!glfwWindowShouldClose(window))
     {
@@ -169,8 +265,12 @@ int graphics_test(void)
         glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
 
-        glBindVertexArray(vao);
-        glDrawArrays(GL_TRIANGLES, 0, 3);
+        //glBindVertexArray(vao);
+        //glDrawArrays(GL_TRIANGLES, 0, 3);
+
+        // Draw grid
+        glBindVertexArray(grid_vao);
+        glDrawElements(GL_TRIANGLES, indices_size, GL_UNSIGNED_INT, 0); // Must use unsigned int here
 
         glfwSwapBuffers(window);
     }
