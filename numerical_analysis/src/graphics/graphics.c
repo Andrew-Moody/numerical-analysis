@@ -1,10 +1,13 @@
 #include "graphics.h"
 
+#include <stdlib.h>
 #include <stdio.h>
 
 // glad must be included before glfw
-#include "glad/glad.h"
-#include "GLFW/glfw3.h"
+#include <glad/glad.h>
+#include <GLFW/glfw3.h>
+
+#include "model.h"
 
 void errorCallbackGLFW(int error, const char *description)
 {
@@ -19,6 +22,8 @@ void framebufferSizeCallback(GLFWwindow *window, int width, int height)
 // Render a triangle to show everything works
 int graphics_test(void)
 {
+    loadModel("../../models/3DBenchy.stl");
+
     // Few functions can be called before glfwInit
     // setting the error callback now ensures it gets called for errors during init
     glfwSetErrorCallback(errorCallbackGLFW);

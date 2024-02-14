@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.13)
 
-# Need to detect the if X11 or Wayland is already installed but using X11 for now
+# Need to detect if X11 or Wayland is already installed but using X11 for now
 set(GLFW_BUILD_WAYLAND OFF CACHE BOOL "Build for Wayland" FORCE)
 
 # Disabling docs removes the need to install Doxygen
