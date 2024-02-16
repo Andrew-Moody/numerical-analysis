@@ -7,14 +7,17 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
+#include "import.h"
+#include "shader.h"
 #include "model.h"
+#include "mesh.h"
 
-void errorCallbackGLFW(int error, const char *description)
+void errorCallbackGLFW(int error, const char* description)
 {
     printf(" GLFW_ERROR : %s\n", description);
 }
 
-void framebufferSizeCallback(GLFWwindow *window, int width, int height)
+void framebufferSizeCallback(GLFWwindow* window, int width, int height)
 {
     glViewport(0, 0, width, height);
 }
@@ -22,8 +25,6 @@ void framebufferSizeCallback(GLFWwindow *window, int width, int height)
 // Render a triangle to show everything works
 int graphics_test(void)
 {
-    loadModel("../../models/3DBenchy.stl");
-
     // Few functions can be called before glfwInit
     // setting the error callback now ensures it gets called for errors during init
     glfwSetErrorCallback(errorCallbackGLFW);
@@ -39,7 +40,7 @@ int graphics_test(void)
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
     // Create a new window (also crates an OpenGL context)
-    GLFWwindow *window = glfwCreateWindow(800, 600, "A GLFW Window", NULL, NULL);
+    GLFWwindow* window = glfwCreateWindow(800, 600, "A GLFW Window", NULL, NULL);
     if (!window)
     {
         printf("GLFW failed to create a window\n");
@@ -74,36 +75,12 @@ int graphics_test(void)
     float vertices[] = {
         -0.5f, -0.5f, 0.0f,
         0.5f, -0.5f, 0.0f,
-        0.0f, 0.5f, 0.0f};
+        0.0f, 0.5f, 0.0f };
 
-    // The unique ID that identifies a Vertex Buffer Object
-    GLuint vbo;
-    GLsizei numBuffers = 1; // Only creating a single buffer in this case
+    struct Mesh triangle_mesh = { vertices, 9, NULL, 0 };
 
-    // Generates 1 or more VBO ids
-    glGenBuffers(numBuffers, &vbo);
-
-    // generate a Vertex Array Object id
-    GLuint vao;
-    glGenVertexArrays(1, &vao);
-    glBindVertexArray(vao);
-    // While bound, Vertex Array Object stores information about the bound Vertex Buffer Object
-    // as calls are made to modify properties on the VBO
-
-    // Binding the buffer to the array buffer target
-    // any calls targeting array buffer will effect vbo until it is unbound
-    glBindBuffer(GL_ARRAY_BUFFER, vbo);
-
-    // Copy vertex data to gpu memory
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-
-    // Tell the gpu how the vertex buffer data is laid out (vbo is still bound)
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void *)0);
-    glEnableVertexAttribArray(0);
-
-    // vao is unbound and now remembers info about the vbo
-    // bind the vao again before drawing
-    glBindVertexArray(0);
+    struct Model triangle_model;
+    model_init(&triangle_model, &triangle_mesh);
 
 
     // Create a grid of quads
@@ -112,9 +89,9 @@ int graphics_test(void)
 
     int grid_size = 3 * (x_steps + 1) * (y_steps + 1);
 
-    float *grid = (float *)malloc(grid_size * sizeof(float));
+    float* grid_vertices = (float*)malloc(grid_size * sizeof(float));
 
-    if (!grid)
+    if (!grid_vertices)
     {
         return -1;
     }
@@ -126,15 +103,15 @@ int graphics_test(void)
         {
             int index = 3 * (i + j * (x_steps + 1));
 
-            grid[index] = -0.5f + (float)i / x_steps;
-            grid[index + 1] = -0.5f + (float)j / y_steps;
-            grid[index + 2] = 0.0f;
+            grid_vertices[index] = -0.5f + (float)i / x_steps;
+            grid_vertices[index + 1] = -0.5f + (float)j / y_steps;
+            grid_vertices[index + 2] = 0.0f;
         }
     }
 
     int indices_size = 6 * x_steps * y_steps;
 
-    unsigned int *grid_indices = (unsigned int *)malloc(indices_size * sizeof(unsigned int));
+    unsigned int* grid_indices = (unsigned int*)malloc(indices_size * sizeof(unsigned int));
 
     if (!grid_indices)
     {
@@ -159,7 +136,6 @@ int graphics_test(void)
             }
 
             // Note winding order
-
             grid_indices[triangle_idx] = v1;
             grid_indices[triangle_idx + 1] = v2;
             grid_indices[triangle_idx + 2] = v3;
@@ -170,97 +146,44 @@ int graphics_test(void)
         }
     }
 
-    GLuint grid_vao;
-    glGenVertexArrays(1, &grid_vao);
-    glBindVertexArray(grid_vao);
+    struct Mesh grid_mesh;
 
-    GLuint grid_vbo;
-    glGenBuffers(1, &grid_vbo);
-    glBindBuffer(GL_ARRAY_BUFFER, grid_vbo);
-    glBufferData(GL_ARRAY_BUFFER, grid_size * sizeof(float), grid, GL_STATIC_DRAW);
-
-    GLuint grid_ebo;
-    glGenBuffers(1, &grid_ebo);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, grid_ebo);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices_size * sizeof(unsigned int), grid_indices, GL_STATIC_DRAW);
-
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void *)0);
-    glEnableVertexAttribArray(0);
-
-    glBindVertexArray(0);
-
-    free(grid);
-    free(grid_indices);
-
-    grid = NULL;
+    grid_mesh.vertices = grid_vertices;
+    grid_mesh.vertices_length = grid_size;
+    grid_mesh.indices = grid_indices;
+    grid_mesh.indices_length = indices_size;
+    grid_vertices = NULL;
     grid_indices = NULL;
 
-    // Basic vertex shader
-    const char *vertexShaderSource = "#version 420 core\n"
-                                     "layout (location = 0) in vec3 aPos;\n"
-                                     "void main() { gl_Position = vec4(aPos.x, aPos.y, aPos.z, 1.0); }\0";
+    struct Model grid_model;
 
-    GLuint vertexShader;
-    vertexShader = glCreateShader(GL_VERTEX_SHADER);
-    glShaderSource(vertexShader, 1, &vertexShaderSource, NULL);
-    glCompileShader(vertexShader);
+    model_init(&grid_model, &grid_mesh);
 
-    int success;
-    glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
 
-    if (!success)
-    {
-        char infoLog[512];
-        glGetShaderInfoLog(vertexShader, 512, NULL, infoLog);
-        printf("Vertex Shader compilation failed: %s\n", infoLog);
-    }
+    // Load a mesh from STL file
 
-    // Basic fragment shader
-    const char *fragmentShaderSource = "#version 420 core\n"
-                                       "out vec4 FragColor;\n"
-                                       "void main() { FragColor = vec4(1.0f, 0.5f, 0.2f, 1.0f); }\0";
+    struct Mesh stl_mesh;
+    load_stl("../../models/3DBenchy.stl", &stl_mesh);
 
-    GLuint fragmentShader;
-    fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(fragmentShader, 1, &fragmentShaderSource, NULL);
-    glCompileShader(fragmentShader);
+    printf("vert length: %i, index length: %i\n", stl_mesh.vertices_length, stl_mesh.indices_length);
 
-    glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &success);
+    struct Model stl_model;
+    model_init(&stl_model, &stl_mesh);
 
-    if (!success)
-    {
-        char infoLog[512];
-        glGetShaderInfoLog(fragmentShader, 512, NULL, infoLog);
-        printf("Fragment Shader compilation failed: %s\n", infoLog);
-    }
 
-    // Link the vertex and fragment shaders into a shader program
-    GLuint shaderProgram = glCreateProgram();
-    glAttachShader(shaderProgram, vertexShader);
-    glAttachShader(shaderProgram, fragmentShader);
-    glLinkProgram(shaderProgram);
-
-    glGetProgramiv(fragmentShader, GL_LINK_STATUS, &success);
-
-    if (!success)
-    {
-        char infoLog[512];
-        glGetShaderInfoLog(fragmentShader, 512, NULL, infoLog);
-        printf("Shader linking failed: %s\n", infoLog);
-    }
-
-    // Shaders aren't needed after linking
-    glDeleteShader(vertexShader);
-    glDeleteShader(fragmentShader);
+    // Create the basic shader program
+    GLuint shader;
+    shader_init(&shader, BASIC_VS_SRC, BASIC_FS_SRC);
 
     // Rendering calls will now use our own shader
-    glUseProgram(shaderProgram);
+    glUseProgram(shader);
 
-    glEnable(GL_CULL_FACE); // Enable back face culling
+    // Enable back face culling
+    glEnable(GL_CULL_FACE);
 
     //glPolygonMode(GL_FRONT_AND_BACK, GL_FILL); // Default
 
-    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE); // Wireframe
 
     // Process Input and Rendering commands until a close event is recieved
     while (!glfwWindowShouldClose(window))
@@ -270,15 +193,23 @@ int graphics_test(void)
         glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
 
-        //glBindVertexArray(vao);
-        //glDrawArrays(GL_TRIANGLES, 0, 3);
+        // Draw Triangle
+        //model_draw(&triangle_model);
 
         // Draw grid
-        glBindVertexArray(grid_vao);
-        glDrawElements(GL_TRIANGLES, indices_size, GL_UNSIGNED_INT, 0); // Must use unsigned int here
+        //model_draw(&grid_model);
+
+        // Draw mesh
+        model_draw(&stl_model);
 
         glfwSwapBuffers(window);
     }
+
+    free(grid_mesh.vertices);
+    free(grid_mesh.indices);
+
+    free(stl_mesh.vertices);
+    free(stl_mesh.indices);
 
     // Destroy a specific window
     glfwDestroyWindow(window);

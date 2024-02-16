@@ -14,7 +14,7 @@ int main(void)
 
     //finiteDifference2D();
 
-    // Render a triangle to show everything was installed correctly
+    // Render a triangle, grid, or imported STL mesh
     graphics_test();
 
     double endTime = omp_get_wtime();

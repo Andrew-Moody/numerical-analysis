@@ -1,23 +1,17 @@
 #pragma once
 
-#include <stdio.h>
+struct Mesh;
 
-#include <assimp/cimport.h>
-#include <assimp/scene.h>
-#include <assimp/postprocess.h>
-
-void loadModel(const char* path)
+struct Model
 {
-    const struct aiScene* scene = aiImportFile(path, 0);
+    unsigned int vertex_array_obj;
+    unsigned int vertex_buffer_obj;
+    unsigned int element_buffer_obj;
+    struct Mesh* mesh;
+};
 
-    if (!scene)
-    {
-        printf("Failed to load model at: %s\n", path);
-    }
-    else
-    {
-        printf("Loaded model at: %s\n", path);
-    }
+void model_init(struct Model* model, struct Mesh* mesh);
 
-    aiReleaseImport(scene);
-}
+void model_draw(struct Model* model);
+
+void model_release(struct Model** model);
