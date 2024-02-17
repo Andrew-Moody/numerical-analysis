@@ -16,8 +16,8 @@ void processMesh(const struct aiScene* scene, const struct aiMesh* ai_mesh, stru
     // the number of vertices (and other per vertex properties) for the current mesh
     unsigned int vert_count = ai_mesh->mNumVertices;
 
-    mesh->vertices_length = 3 * vert_count;
-    mesh->vertices = (float*)malloc(sizeof(float) * mesh->vertices_length);
+    mesh->vertices_length = vert_count;
+    mesh->vertices = (struct Vertex*)malloc(sizeof(struct Vertex) * mesh->vertices_length);
 
     if (!mesh->vertices)
     {
@@ -26,16 +26,13 @@ void processMesh(const struct aiScene* scene, const struct aiMesh* ai_mesh, stru
 
     for (int i = 0; i < vert_count; ++i)
     {
-        // Import as is
-        //mesh->vertices[3 * i] = ai_mesh->mVertices[i].x;
-        //mesh->vertices[3 * i + 1] = ai_mesh->mVertices[i].y;
-        //mesh->vertices[3 * i + 2] = ai_mesh->mVertices[i].z;
+        mesh->vertices[i].x = ai_mesh->mVertices[i].x;
+        mesh->vertices[i].y = ai_mesh->mVertices[i].y;
+        mesh->vertices[i].z = ai_mesh->mVertices[i].z;
 
-        // Rotate 90 about x axis, scale, and translate to fit screen
-        float scale = 0.025f;
-        mesh->vertices[3 * i] = ai_mesh->mVertices[i].x * scale;
-        mesh->vertices[3 * i + 1] = ai_mesh->mVertices[i].z * scale - 0.5f;
-        mesh->vertices[3 * i + 2] = -ai_mesh->mVertices[i].y * scale;
+        mesh->vertices[i].r = ai_mesh->mVertices[i].x * 0.025f;
+        mesh->vertices[i].g = ai_mesh->mVertices[i].z * 0.025f;
+        mesh->vertices[i].b = -ai_mesh->mVertices[i].y * 0.025f;
     }
 
     unsigned int face_count = ai_mesh->mNumFaces;

@@ -6,11 +6,13 @@ target_sources(fluid_analysis
         mesh.c
         model.c
         import.c
+        shader.c
         graphics.h
         mesh.h
         model.h
         import.h
         shader.h
+        matrix.h
 )
 
 target_include_directories(fluid_analysis

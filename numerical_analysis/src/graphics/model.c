@@ -18,6 +18,8 @@ void model_init(struct Model* model, struct Mesh* mesh)
 
     model->mesh = mesh;
 
+    model->transform = MAT4_IDENTITY;
+
     // OpenGL resources are identified by id number
 
     // Generate and bind a Vertex Array Object (to store attributes)
@@ -32,12 +34,16 @@ void model_init(struct Model* model, struct Mesh* mesh)
     glBindBuffer(GL_ARRAY_BUFFER, model->vertex_buffer_obj);
 
     // Copy vertex data to gpu memory
-    glBufferData(GL_ARRAY_BUFFER, mesh->vertices_length * sizeof(float), mesh->vertices, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, mesh->vertices_length * sizeof(struct Vertex), mesh->vertices, GL_STATIC_DRAW);
 
     // Tell the gpu how the vertex buffer data is laid out (vbo is still bound) this can be done manually
     // each time the vbo is bound or use the vao to store this info and use it when the vao is bound
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(struct Vertex), (void*)0);
     glEnableVertexAttribArray(0);
+
+    // Attribute layout for vertex color
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(struct Vertex), (void*)(3 * sizeof(float)));
+    glEnableVertexAttribArray(1);
 
     if (mesh->indices)
     {
@@ -58,10 +64,16 @@ void model_init(struct Model* model, struct Mesh* mesh)
     glBindVertexArray(0);
 }
 
-void model_draw(struct Model* model)
+void model_draw(struct Model* model, unsigned int transform_id)
 {
+    // Set the shader transform uniform
+    glUniformMatrix4fv(transform_id, 1, GL_FALSE, (float*)&model->transform);
+
+    // Bind the vertex array object (implicitly binds vertex buffer object)
     glBindVertexArray(model->vertex_array_obj);
 
+    // If the model has indices bind the element buffer object and draw as elements
+    // otherwise draw as an array of triangles (basically draw as if indices were in order)
     if (model->element_buffer_obj)
     {
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, model->element_buffer_obj);
