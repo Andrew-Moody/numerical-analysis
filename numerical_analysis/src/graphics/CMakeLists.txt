@@ -7,11 +7,13 @@ target_sources(fluid_analysis
         model.c
         import.c
         shader.c
+        camera.c
         graphics.h
         mesh.h
         model.h
         import.h
         shader.h
+        camera.h
         matrix.h
 )
 

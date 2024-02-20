@@ -62,10 +62,33 @@ void model_init(struct Model* model, struct Mesh* mesh)
     // vao is unbound here but remembers info about the vbo
     // bind the vao again before drawing
     glBindVertexArray(0);
+
+    model->cull_backface = 0;
+    model->draw_wireframe = 0;
 }
 
 void model_draw(struct Model* model, unsigned int transform_id)
 {
+    // Enable/Disable back face culling
+    if (model->cull_backface)
+    {
+        glEnable(GL_CULL_FACE);
+    }
+    else
+    {
+        glDisable(GL_CULL_FACE);
+    }
+
+    // Select Fill/Wireframe
+    if (model->draw_wireframe)
+    {
+        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE); // Wireframe
+    }
+    else
+    {
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL); // Default
+    }
+
     // Set the shader transform uniform
     glUniformMatrix4fv(transform_id, 1, GL_FALSE, (float*)&model->transform);
 

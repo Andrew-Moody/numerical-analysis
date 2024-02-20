@@ -12,7 +12,8 @@
 const char* BASIC_VS_SRC = "#version 420 core\n"
 "layout (location = 0) in vec3 aPos;\n"
 "uniform mat4 transform;\n"
-"void main() { gl_Position = transform * vec4(aPos.x, aPos.y, aPos.z, 1.0); }\0";
+"uniform mat4 projection;\n"
+"void main() { gl_Position = projection * transform * vec4(aPos.x, aPos.y, aPos.z, 1.0); }\0";
 
 // Basic fragment shader
 const char* BASIC_FS_SRC = "#version 420 core\n"
@@ -26,8 +27,9 @@ const char* VCOLOR_VS_SRC = "#version 420 core\n"
 "layout (location = 1) in vec3 Color;\n"
 "out vec3 VertexColor;\n"
 "uniform mat4 transform;\n"
+"uniform mat4 projection;\n"
 "void main() {\n"
-"gl_Position = transform * vec4(aPos.x, aPos.y, aPos.z, 1.0);\n"
+"gl_Position = projection * transform * vec4(aPos.x, aPos.y, aPos.z, 1.0);\n"
 "VertexColor = Color;\n"
 "}\0";
 

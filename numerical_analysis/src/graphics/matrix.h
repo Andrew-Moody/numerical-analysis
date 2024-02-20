@@ -165,6 +165,20 @@ static inline struct mat4 mat4_scale(float x, float y, float z)
     return translation;
 }
 
+static inline struct mat4 mat4_transform(float px, float py, float pz, float rx, float ry, float rz, float sx, float sy, float sz)
+{
+    struct mat4 translation = mat4_translation(px, py, pz);
+    struct mat4 rotation = mat4_rotation(rx, ry, rz);
+    struct mat4 scale = mat4_scale(sx, sy, sz);
+
+    // Multiplication order is Scale * Rot * Trans because the multiplication
+    // function is in terms of a row major matrix. May decide to change this around
+    struct mat4 transform = mat4_multiply(rotation, translation);
+    transform = mat4_multiply(scale, transform);
+
+    return transform;
+}
+
 static inline void mat4_print(struct mat4 mat)
 {
     printf("| %7.3f, %7.3f, %7.3f, %7.3f |\n| %7.3f, %7.3f, %7.3f, %7.3f |\n| %7.3f, %7.3f, %7.3f, %7.3f |\n| %7.3f, %7.3f, %7.3f, %7.3f |\n\n",

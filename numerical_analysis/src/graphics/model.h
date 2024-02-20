@@ -11,6 +11,8 @@ struct Model
     unsigned int element_buffer_obj;
     struct Mesh* mesh;
     struct mat4 transform;
+    int cull_backface;
+    int draw_wireframe;
 };
 
 void model_init(struct Model* model, struct Mesh* mesh);

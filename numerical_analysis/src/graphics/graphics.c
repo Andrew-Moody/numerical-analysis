@@ -13,6 +13,7 @@
 #include "mesh.h"
 #include "grid.h"
 #include "matrix.h"
+#include "camera.h"
 
 void errorCallbackGLFW(int error, const char* description)
 {
@@ -73,27 +74,6 @@ int graphics_test(void)
     // setting to 0 removes the limit allowing the framerate to be uncapped
     glfwSwapInterval(1);
 
-    // Create a grid of quads
-    int x_steps = 25;
-    int y_steps = 25;
-
-    struct Mesh grid_mesh;
-    create_grid_mesh(x_steps, y_steps, &grid_mesh);
-
-    struct Model grid_model;
-    model_init(&grid_model, &grid_mesh);
-
-
-    // Load a mesh from STL file
-    struct Mesh stl_mesh;
-    load_stl("../../models/3DBenchy.stl", &stl_mesh);
-
-    printf("vert length: %i, index length: %i\n", stl_mesh.vertices_length, stl_mesh.indices_length);
-
-    struct Model stl_model;
-    model_init(&stl_model, &stl_mesh);
-
-
     // Create the basic shader program
     GLuint shader;
     //shader_init(&shader, BASIC_VS_SRC, BASIC_FS_SRC);
@@ -105,26 +85,45 @@ int graphics_test(void)
     // Get an id for the transform matrix in the basic shader
     GLuint transform_id = glGetUniformLocation(shader, "transform");
 
-    // Original model is too big to fit on screen unless perspective projection is used
+    // Get the id for the projection matrix
+    GLuint projection_id = glGetUniformLocation(shader, "projection");
+
+
+    struct Camera camera;
+    camera_init(&camera, 800, 600, 0.f, 10.f, 4.0f);
+
+    glUniformMatrix4fv(projection_id, 1, GL_FALSE, (float*)&camera.proj_matrix);
+
+    // Create a grid of quads
+    int x_steps = 25;
+    int y_steps = 25;
+
+    struct Mesh grid_mesh;
+    create_grid_mesh(x_steps, y_steps, &grid_mesh);
+
+    struct Model grid_model;
+    model_init(&grid_model, &grid_mesh);
+    grid_model.transform = MAT4_IDENTITY;
+    grid_model.cull_backface = GL_TRUE;
+    grid_model.draw_wireframe = GL_TRUE;
+
+    // Load a mesh from STL file
+    struct Mesh stl_mesh;
+    //load_stl("../../models/3DBenchy.stl", &stl_mesh);
+    load_stl("../../models/orientation.stl", &stl_mesh);
+
+    printf("vert length: %i, index length: %i\n", stl_mesh.vertices_length, stl_mesh.indices_length);
+
+    struct Model stl_model;
+    model_init(&stl_model, &stl_mesh);
+    stl_model.transform = mat4_transform(0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 1.f, 1.f, 1.f);
+    stl_model.cull_backface = GL_FALSE;
+    stl_model.draw_wireframe = GL_TRUE;
+
+    // Benchy model is too big to fit on screen unless perspective projection is used
     // also needed to be rotated and shifted down to center on the screen
-    struct mat4 scale = mat4_scale(0.025f, 0.025f, 0.025f);
-    struct mat4 rotation = mat4_rotation(-90.0f, 0.0f, 0.0f);
-    struct mat4 translation = mat4_translation(0.0f, -0.5f, 0.0f);
+    //stl_model.transform = mat4_transform(0.0f, -0.5f, 0.0f, -90.0f, 0.0f, 0.0f, 0.025f, 0.025f, 0.025f);
 
-    // Multiplication order is Scale * Rot * Trans because the multiplication
-    // function is in terms of a row major matrix. May decide to change this around
-    struct mat4 transform = mat4_multiply(rotation, translation);
-    transform = mat4_multiply(scale, transform);
-
-    stl_model.transform = transform;
-
-
-    // Enable back face culling
-    glEnable(GL_CULL_FACE);
-
-    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL); // Default
-
-    //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE); // Wireframe
 
     // Process Input and Rendering commands until a close event is recieved
     while (!glfwWindowShouldClose(window))
@@ -152,7 +151,7 @@ int graphics_test(void)
     // Destroy a specific window
     glfwDestroyWindow(window);
 
-    // Call when finished with GLFW should release any remaining windows/resources
+    // Call when finished with GLFW to release any remaining windows/resources
     glfwTerminate();
 
     return 0;
