@@ -12,7 +12,7 @@
 #include "model.h"
 #include "mesh.h"
 #include "grid.h"
-#include "matrix.h"
+#include "transform.h"
 #include "camera.h"
 
 void errorCallbackGLFW(int error, const char* description)

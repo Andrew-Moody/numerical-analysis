@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.13)
 
-target_sources(fluid_analysis
+target_sources(numerical_analysis
     PRIVATE
         graphics.c
         mesh.c
@@ -14,10 +14,9 @@ target_sources(fluid_analysis
         import.h
         shader.h
         camera.h
-        matrix.h
 )
 
-target_include_directories(fluid_analysis
+target_include_directories(numerical_analysis
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
     PRIVATE
