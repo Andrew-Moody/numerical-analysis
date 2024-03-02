@@ -108,6 +108,9 @@ void structural(void)
 
     int element_count = 1;
 
+    int dof_per_node = 6;
+    int dof_count = dof_per_node * node_count;
+
     // it's also recommended to not cast the result of malloc as that could hide errors and is not necessary. C++ is 
     // different because void* will not implicitly convert and needs a cast but use of malloc in C++ is a special case
 
@@ -130,22 +133,27 @@ void structural(void)
 
     // Define node positions
     nodes[0].pos = (struct vec3){ 0.f, 0.f, 0.f };
-    nodes[1].pos = (struct vec3){ 0.f, 1.f, 0.f };
-
-    // Define boundary conditions (node1 is fixed, node2 has a force applied)
-    nodes[0].displacement = (struct vec3){ 0.f, 0.f, 0.f };
-    nodes[0].rotation = (struct vec3){ 0.f, 0.f, 0.f };
-    nodes[1].force = (struct vec3){ 1.f, 1.f, 1.f };
+    nodes[1].pos = (struct vec3){ 1.f, 0.f, 0.f };
 
     // Define an element between node1 and node2
-    elements[0] = (struct Element){ 0, 1, elastic_modulus, shear_modulus, 1.f };
+    //elements[0] = (struct Element){ 0, 1, elastic_modulus, shear_modulus, 1.f };
+    elements[0] = (struct Element){ 0, 1, 1, shear_modulus, 1.f };
 
+    // Alocate and initialize to zero memory for the forces, displacements, and stiffness matrix
+    float* k_global = malloc(sizeof(*k_global) * dof_count * dof_count);
 
-    float* k_global = malloc(sizeof(*k_global) * 36 * node_count * node_count);
-
-    for (int i = 0; i < 36 * node_count * node_count; ++i)
+    for (int i = 0; i < dof_count * dof_count; ++i)
     {
         k_global[i] = 0;
+    }
+
+    float* displacements = malloc(sizeof(*displacements) * dof_count);
+    float* forces = malloc(sizeof(*forces) * dof_count);
+
+    for (int i = 0; i < dof_count; ++i)
+    {
+        displacements[i] = 0.f;
+        forces[i] = 0.f;
     }
 
     for (int element_idx = 0; element_idx < element_count; ++element_idx)
@@ -242,9 +250,7 @@ void structural(void)
         // if the dot product magnitude between local x and global y is small
         // then they are close to alignment (regardless of direction) and global z
         // becomes a better choice
-        float dot = abs(vec3_dot(x_axis, (struct vec3) { 0.f, 1.f, 0.f }));
-        printf("dot: %f\n", dot);
-        if (dot < 0.5f)
+        if (abs(vec3_dot(x_axis, (struct vec3) { 0.f, 1.f, 0.f })) < 0.5f)
         {
             // local y is reasonably close to global y so the local z axis in global frame
             // is the normalized cross product between the local x axis in global frame and the global y axis
@@ -254,10 +260,6 @@ void structural(void)
             // Now local y is just cross product of local z and local x
             y_axis = vec3_cross(z_axis, x_axis);
             y_axis = vec3_normalize(y_axis); // should be unit length already but might as well make sure
-
-            printf("x_axis: %2.f, %2.f, %2.f\n", x_axis.x, x_axis.y, x_axis.z);
-            printf("y_axis: %2.f, %2.f, %2.f\n", y_axis.x, y_axis.y, y_axis.z);
-            printf("z_axis: %2.f, %2.f, %2.f\n", z_axis.x, z_axis.y, z_axis.z);
         }
         else
         {
@@ -265,18 +267,11 @@ void structural(void)
             // is the normalized cross product between the global z axis and the local x axis in global frame
             // (could have also done vec3_cross(x_axis, (struct vec3) { 0.f, 0.f, -1.f }) just comfirm with right hand rule)
             y_axis = vec3_cross((struct vec3) { 0.f, 0.f, 1.f }, x_axis);
-
-            printf("z_axis: %2.1f, %2.1f, %2.1f\nn", z_axis.x, z_axis.y, z_axis.z);
-
             y_axis = vec3_normalize(y_axis);
 
             // Now local z is just cross product of local x and local y
             z_axis = vec3_cross(x_axis, y_axis);
             z_axis = vec3_normalize(z_axis); // should be unit length already but might as well make sure
-
-            printf("x_axis: %2.f, %2.f, %2.f\n", x_axis.x, x_axis.y, x_axis.z);
-            printf("y_axis: %2.f, %2.f, %2.f\n", y_axis.x, y_axis.y, y_axis.z);
-            printf("z_axis: %2.f, %2.f, %2.f\n", z_axis.x, z_axis.y, z_axis.z);
         }
 
         // Build the transformation matrix from global to local for this element
@@ -287,9 +282,9 @@ void structural(void)
         };
 
 
-        /* printf("x_axis: %2.f, %2.f, %2.f\n", x_axis.x, x_axis.y, x_axis.z);
+        printf("x_axis: %2.f, %2.f, %2.f\n", x_axis.x, x_axis.y, x_axis.z);
         printf("y_axis: %2.f, %2.f, %2.f\n", y_axis.x, y_axis.y, y_axis.z);
-        printf("z_axis: %2.f, %2.f, %2.f\n", z_axis.x, z_axis.y, z_axis.z); */
+        printf("z_axis: %2.f, %2.f, %2.f\n", z_axis.x, z_axis.y, z_axis.z);
 
         // Add the local contributions to the global stiffness matrix
         add_local_stiffness(k_global, k11, transform, node1, node1, node_count);
@@ -299,16 +294,152 @@ void structural(void)
     }
 
 
-    for (int j = 0; j < 6 * node_count; ++j)
+    for (int j = 0; j < dof_count; ++j)
     {
-        for (int i = 0; i < 6 * node_count; ++i)
+        for (int i = 0; i < dof_count; ++i)
         {
-            printf("%2.0f ", k_global[i + j * 6 * node_count]);
+            printf("%2.0f ", k_global[i + j * dof_count]);
         }
 
         printf("\n");
     }
 
+    printf("\n\n");
+
+
+    // Need to make a copy of k_global before modifying it to add boundary conditions as it will be used later
+    float* k_boundary = malloc(sizeof(*k_boundary) * dof_count * dof_count);
+
+    for (int i = 0; i < dof_count * dof_count; ++i)
+    {
+        k_boundary[i] = k_global[i];
+    }
+
+    // Add boundary conditions
+
+    // Fix displacement to zero at node1
+    int node_fixed = 0;
+
+    // Apply a force at node2
+    int node_forced = 1;
+
+    int stride = dof_per_node * dof_count; // offset between node starts for successive nodes
+    int nodestart = node_fixed * stride;
+
+    // Set the global stiffness rows and columns for Ux, Uy, Uz to 1 on diagonal and 0 everywhere else
+    // for the node that is fixed (setting diagonals to 1 is not strictly necessary but facilitates some solution methods)
+    for (int j = nodestart; j < 3 + nodestart; ++j)
+    {
+        for (int i = nodestart; i < dof_count + nodestart; ++i)
+        {
+            k_boundary[i + dof_count * j] = i == j ? 1 : 0;
+        }
+    }
+
+    for (int j = nodestart; j < dof_count + nodestart; ++j)
+    {
+        for (int i = nodestart; i < 3 + nodestart; ++i)
+        {
+            k_boundary[i + dof_count * j] = i == j ? 1 : 0;
+        }
+    }
+
+    for (int j = 0; j < dof_count; ++j)
+    {
+        for (int i = 0; i < dof_count; ++i)
+        {
+            printf("%2.2f ", k_boundary[i + j * dof_count]);
+        }
+
+        printf("\n");
+    }
+
+    printf("\n\n");
+
+
+    forces[dof_per_node * node_forced] = 1.0f;
+    forces[dof_per_node * node_forced + 1] = 0.0f;
+    forces[dof_per_node * node_forced + 2] = 0.0f;
+
+
+    // F = KU can now be solved
+
+
+    // Jacobi Method for iteratively solving linear equations
+    int iterations = 10;
+    for (int t = 0; t < 10; ++t)
+    {
+        // Solve one row at a time
+        for (int j = 0; j < dof_count; ++j)
+        {
+            // sum up k_ij * u_i as long as i != j
+            float x = 0;
+            for (int i = 0; i < dof_count; ++i)
+            {
+                if (i != j)
+                {
+                    x += k_boundary[i + j * dof_count] * displacements[i];
+                }
+            }
+
+            // subtract the sum from the f_j and divide by k_jj
+            x = forces[j] - x;
+
+            // if you ensure diagonals are set to 1 if not active this check can be skipped
+            float k_jj = k_boundary[j + j * dof_count];
+            if (k_jj != 0.f)
+            {
+                x /= k_jj;
+            }
+
+            // update displacement u_j to the new estimate
+            displacements[j] = x;
+        }
+    }
+
+    // Back calculate unknown forces from known displacements
+    // by multipling the stiffness matrix times the displacement vector
+    for (int j = 0; j < dof_count; ++j)
+    {
+        float f = 0;
+        for (int i = 0; i < dof_count; ++i)
+        {
+            f += k_global[i + j * dof_count] * displacements[i];
+        }
+
+        forces[j] = f;
+    }
+
+
+    for (int n = 0; n < node_count; ++n)
+    {
+        printf("Node %i Displacement: (%2.2f, %2.2f, %2.2f), Rotation: (%2.2f, %2.2f, %2.2f)\n", n,
+            displacements[n * dof_per_node],
+            displacements[n * dof_per_node + 1],
+            displacements[n * dof_per_node + 2],
+            displacements[n * dof_per_node + 3],
+            displacements[n * dof_per_node + 4],
+            displacements[n * dof_per_node + 5]
+        );
+    }
+
+    printf("\n");
+
+    for (int n = 0; n < node_count; ++n)
+    {
+        printf("Node %i Force: (%2.2f, %2.2f, %2.2f), Moment: (%2.2f, %2.2f, %2.2f)\n", n,
+            forces[n * dof_per_node],
+            forces[n * dof_per_node + 1],
+            forces[n * dof_per_node + 2],
+            forces[n * dof_per_node + 3],
+            forces[n * dof_per_node + 4],
+            forces[n * dof_per_node + 5]
+        );
+    }
+
+
+    free(forces);
+    free(displacements);
 
     free(k_global);
     free(nodes);
