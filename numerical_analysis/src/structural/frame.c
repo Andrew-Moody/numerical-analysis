@@ -5,141 +5,20 @@
 #include <math.h>
 
 #include "vector.h"
+#include "matrix.h"
+#include "linearsolve.h"
+#include "mesh.h"
 
 
-struct Node
+void transform_element_stiffness(float* k_local, struct mat3 transform);
+void add_element_stiffness(float* k_global, float* k_element, struct mat3 transform, int node1, int node2, int node_count);
+
+void frame_solve(struct Frame* frame)
 {
-    struct vec3 pos;
-    struct vec3 force;
-    struct vec3 moment;
-    struct vec3 displacement;
-    struct vec3 rotation;
-};
-
-
-struct Element
-{
-    int node1;
-    int node2;
-    float elastic_modulus;
-    float shear_modulus;
-    float radius;
-};
-
-
-void add_local_stiffness(float* k_global, float* k_local, struct mat3 transform, int node1, int node2, int node_count)
-{
-    // Inverse transformation matrix is its transpose
-    struct mat3 transinv = mat3_transpose(transform);
-
-    float transform6x6[36];
-
-    for (int j = 0; j < 6; ++j)
-    {
-        for (int i = 0; i < 6; ++i)
-        {
-            transform6x6[i + j * 6] = 0;
-        }
-    }
-
-    transform6x6[0] = transform.e11;
-    transform6x6[1] = transform.e12;
-    transform6x6[2] = transform.e13;
-
-    transform6x6[6] = transform.e21;
-    transform6x6[7] = transform.e22;
-    transform6x6[8] = transform.e23;
-
-    transform6x6[12] = transform.e31;
-    transform6x6[13] = transform.e32;
-    transform6x6[14] = transform.e33;
-
-    transform6x6[21] = transform.e11;
-    transform6x6[22] = transform.e12;
-    transform6x6[23] = transform.e13;
-
-    transform6x6[27] = transform.e21;
-    transform6x6[28] = transform.e22;
-    transform6x6[29] = transform.e23;
-
-    transform6x6[33] = transform.e31;
-    transform6x6[34] = transform.e32;
-    transform6x6[35] = transform.e33;
-
-    float invtrans6x6[36];
-    for (int i = 0; i < 36; ++i)
-    {
-        invtrans6x6[i] = transform6x6[i];
-    }
-
-    mat6_transpose(invtrans6x6);
-
-    float kxt[36];
-    mat6_multiply(kxt, k_local, transform6x6);
-    float k_g[36];
-    mat6_multiply(k_g, invtrans6x6, kxt);
-
-    int offset = 6 * node1 + 36 * (node2 * node_count);
-
-    for (int j = 0; j < 6; ++j)
-    {
-        for (int i = 0; i < 6; ++i)
-        {
-            int local_idx = i + j * 6;
-
-            int global_idx = i + offset + j * 6 * node_count;
-
-            k_global[global_idx] += k_g[local_idx];
-        }
-    }
-}
-
-
-void structural(void)
-{
-    printf("test\n");
-
-    // Material properties for 1040 mild steel annealed (13 C)
-    const float elastic_modulus = 200.f; // GPa
-    const float shear_modulus = 80.f; // GPa
-    const float yield_strength = 0.415f; // GPa, 415 MPa
-
-    int node_count = 2;
-
-    int element_count = 1;
-
     int dof_per_node = 6;
-    int dof_count = dof_per_node * node_count;
+    int dof_count = dof_per_node * frame->node_count;
 
-    // it's also recommended to not cast the result of malloc as that could hide errors and is not necessary. C++ is 
-    // different because void* will not implicitly convert and needs a cast but use of malloc in C++ is a special case
-
-    // using sizeof on the dereferenced pointer keeps the type coupled to the type of the pointer so no need to
-    // change the sizeof expression if the pointer type changes and will give an error if the variable name changes
-    // sizeof(*ptr) is evaluated at compile time so the pointer is not actually dereferenced and is fine to be NULL
-
-    // it is also sometimes recommended to put the sizeof expression first since this insures multiplications are
-    // done with size_t. for example if width and height are int on a 64 bit system width * height * sizeof(something)
-    // could overflow the temp int result of width * height but sizeof(something) * width * height will not unless it would
-    // overflow size_t regardless
-
-    struct Node* nodes = NULL;
-    size_t nodes_size = sizeof(*nodes) * node_count;
-    nodes = malloc(nodes_size);
-
-    struct Element* elements = NULL;
-    size_t elements_size = sizeof(*elements) * element_count;
-    elements = malloc(elements_size);
-
-    // Define node positions
-    nodes[0].pos = (struct vec3){ 0.f, 0.f, 0.f };
-    nodes[1].pos = (struct vec3){ 1.f, 0.f, 0.f };
-
-    // Define an element between node1 and node2
-    //elements[0] = (struct Element){ 0, 1, elastic_modulus, shear_modulus, 1.f };
-    elements[0] = (struct Element){ 0, 1, 1, shear_modulus, 1.f };
-
-    // Alocate and initialize to zero memory for the forces, displacements, and stiffness matrix
+    // Alocate memory and initialize to zero for the forces, displacements, and stiffness matrix
     float* k_global = malloc(sizeof(*k_global) * dof_count * dof_count);
 
     for (int i = 0; i < dof_count * dof_count; ++i)
@@ -156,14 +35,15 @@ void structural(void)
         forces[i] = 0.f;
     }
 
-    for (int element_idx = 0; element_idx < element_count; ++element_idx)
+    // Add each elements contribution to the stiffness matrix
+    for (int element_idx = 0; element_idx < frame->element_count; ++element_idx)
     {
-        int node1 = elements[element_idx].node1;
-        int node2 = elements[element_idx].node2;
+        int node1 = frame->elements[element_idx].node1;
+        int node2 = frame->elements[element_idx].node2;
 
-        float length = vec3_distance(nodes[node1].pos, nodes[node2].pos);
-        float area = elements[element_idx].radius * elements[element_idx].radius * 3.14159f;
-        float k = elements[element_idx].elastic_modulus * area / length;
+        float length = vec3_distance(frame->nodes[node1].pos, frame->nodes[node2].pos);
+        float area = frame->elements[element_idx].radius * frame->elements[element_idx].radius * 3.14159f;
+        float k = frame->elements[element_idx].elastic_modulus * area / length;
 
         // Fx = k * Ux
 
@@ -233,12 +113,12 @@ void structural(void)
 
         // If we do make the assumption that theta_x is zero then we know that a global vector pointing in the global y direction
         // is incident on the local x-y plane of the element and likewise a global vector in the z direction is incident
-        // on the local x-z plane so we can use either as a starting point we just need one where the magnitude of the crossproduct
-        // local x axis is not close enough to zero to cause floating point errors when normalizing
+        // on the local x-z plane so we can use either as a starting point we just need one where the magnitude of the cross product
+        // with the local x axis is not close enough to zero to cause floating point errors when normalizing
         // this can be checked easily by checking if the dot product magnitude is close to 1 and picking the other vector if so
 
         // normalize the element axial vector to give the local x axis in global frame
-        struct vec3 x_axis = vec3_subtract(nodes[node2].pos, nodes[node1].pos);
+        struct vec3 x_axis = vec3_subtract(frame->nodes[node2].pos, frame->nodes[node1].pos);
         x_axis = vec3_normalize(x_axis);
 
         // Default initialize y and x axis
@@ -284,13 +164,13 @@ void structural(void)
 
         printf("x_axis: %2.f, %2.f, %2.f\n", x_axis.x, x_axis.y, x_axis.z);
         printf("y_axis: %2.f, %2.f, %2.f\n", y_axis.x, y_axis.y, y_axis.z);
-        printf("z_axis: %2.f, %2.f, %2.f\n", z_axis.x, z_axis.y, z_axis.z);
+        printf("z_axis: %2.f, %2.f, %2.f\n\n", z_axis.x, z_axis.y, z_axis.z);
 
         // Add the local contributions to the global stiffness matrix
-        add_local_stiffness(k_global, k11, transform, node1, node1, node_count);
-        add_local_stiffness(k_global, k12, transform, node1, node2, node_count);
-        add_local_stiffness(k_global, k21, transform, node2, node1, node_count);
-        add_local_stiffness(k_global, k22, transform, node2, node2, node_count);
+        add_element_stiffness(k_global, k11, transform, node1, node1, frame->node_count);
+        add_element_stiffness(k_global, k12, transform, node1, node2, frame->node_count);
+        add_element_stiffness(k_global, k21, transform, node2, node1, frame->node_count);
+        add_element_stiffness(k_global, k22, transform, node2, node2, frame->node_count);
     }
 
 
@@ -317,38 +197,41 @@ void structural(void)
 
     // Add boundary conditions
 
-    // Fix displacement to zero at node1
-    int node_fixed = 0;
+    // Fix displacement to zero for some nodes
+    int fixed_count = 3;
+    int fixed_nodes[3] = { 1, 2, 3 };
 
     // Apply a force at node2
-    int node_forced = 1;
+    int node_forced = 0;
 
-    int stride = dof_per_node * dof_count; // offset between node starts for successive nodes
-    int nodestart = node_fixed * stride;
 
-    // Set the global stiffness rows and columns for Ux, Uy, Uz to 1 on diagonal and 0 everywhere else
-    // for the node that is fixed (setting diagonals to 1 is not strictly necessary but facilitates some solution methods)
-    for (int j = nodestart; j < 3 + nodestart; ++j)
+    for (int n = 0; n < fixed_count; ++n)
     {
-        for (int i = nodestart; i < dof_count + nodestart; ++i)
+        // Set the global stiffness rows and columns for Ux, Uy, Uz to 1 on diagonal and 0 everywhere else
+        // for the node that is fixed (setting diagonals to 1 is not strictly necessary but facilitates some solution methods)
+        int node = fixed_nodes[n];
+        int rowstart = node * dof_per_node * dof_count;
+        int colstart = node * dof_per_node;
+
+        for (int j = 0; j < 6; ++j)
         {
-            k_boundary[i + dof_count * j] = i == j ? 1 : 0;
+            for (int i = 0; i < dof_count; ++i)
+            {
+                k_boundary[rowstart + i + j * dof_count] = 0;
+
+                k_boundary[colstart + j + i * dof_count] = 0;
+            }
+
+            k_boundary[rowstart + colstart + dof_count * j + j] = 1;
         }
     }
 
-    for (int j = nodestart; j < dof_count + nodestart; ++j)
-    {
-        for (int i = nodestart; i < 3 + nodestart; ++i)
-        {
-            k_boundary[i + dof_count * j] = i == j ? 1 : 0;
-        }
-    }
-
+    printf("Stiffness modified with boundary conditions\n");
     for (int j = 0; j < dof_count; ++j)
     {
         for (int i = 0; i < dof_count; ++i)
         {
-            printf("%2.2f ", k_boundary[i + j * dof_count]);
+            printf("%2.f ", k_boundary[i + j * dof_count]);
         }
 
         printf("\n");
@@ -357,61 +240,44 @@ void structural(void)
     printf("\n\n");
 
 
-    forces[dof_per_node * node_forced] = 1.0f;
+    // Set known boundary forces
+    forces[dof_per_node * node_forced] = 1700.0f;
     forces[dof_per_node * node_forced + 1] = 0.0f;
     forces[dof_per_node * node_forced + 2] = 0.0f;
 
+    // F = KU can now be solved for the displacements U = k^-1 * F
+    // using the known boundary condition forces
+    solve_jacobi(k_boundary, displacements, forces, dof_count, dof_count, 100, 1);
 
-    // F = KU can now be solved
 
+    // Back calculate unknown forces now that displacements are known by multipling 
+    // the stiffness matrix times the displacement vector F = KU
+    matrix_premultiply(forces, k_global, displacements, dof_count, dof_count);
 
-    // Jacobi Method for iteratively solving linear equations
-    int iterations = 10;
-    for (int t = 0; t < 10; ++t)
+    // Update the frames per node properties to use for rendering and analysis
+    for (int i = 0; i < frame->node_count; ++i)
     {
-        // Solve one row at a time
-        for (int j = 0; j < dof_count; ++j)
-        {
-            // sum up k_ij * u_i as long as i != j
-            float x = 0;
-            for (int i = 0; i < dof_count; ++i)
-            {
-                if (i != j)
-                {
-                    x += k_boundary[i + j * dof_count] * displacements[i];
-                }
-            }
+        frame->nodes[i].force.x = forces[i * dof_per_node];
+        frame->nodes[i].force.y = forces[i * dof_per_node + 1];
+        frame->nodes[i].force.z = forces[i * dof_per_node + 2];
 
-            // subtract the sum from the f_j and divide by k_jj
-            x = forces[j] - x;
+        frame->nodes[i].moment.x = forces[i * dof_per_node + 3];
+        frame->nodes[i].moment.y = forces[i * dof_per_node + 4];
+        frame->nodes[i].moment.z = forces[i * dof_per_node + 5];
 
-            // if you ensure diagonals are set to 1 if not active this check can be skipped
-            float k_jj = k_boundary[j + j * dof_count];
-            if (k_jj != 0.f)
-            {
-                x /= k_jj;
-            }
+        frame->nodes[i].displacement.x = displacements[i * dof_per_node];
+        frame->nodes[i].displacement.y = displacements[i * dof_per_node + 1];
+        frame->nodes[i].displacement.z = displacements[i * dof_per_node + 2];
 
-            // update displacement u_j to the new estimate
-            displacements[j] = x;
-        }
-    }
-
-    // Back calculate unknown forces from known displacements
-    // by multipling the stiffness matrix times the displacement vector
-    for (int j = 0; j < dof_count; ++j)
-    {
-        float f = 0;
-        for (int i = 0; i < dof_count; ++i)
-        {
-            f += k_global[i + j * dof_count] * displacements[i];
-        }
-
-        forces[j] = f;
+        frame->nodes[i].rotation.y = displacements[i * dof_per_node + 3];
+        frame->nodes[i].rotation.x = displacements[i * dof_per_node + 4];
+        frame->nodes[i].rotation.z = displacements[i * dof_per_node + 5];
     }
 
 
-    for (int n = 0; n < node_count; ++n)
+    // Print Node displacments and forces
+
+    for (int n = 0; n < frame->node_count; ++n)
     {
         printf("Node %i Displacement: (%2.2f, %2.2f, %2.2f), Rotation: (%2.2f, %2.2f, %2.2f)\n", n,
             displacements[n * dof_per_node],
@@ -425,7 +291,7 @@ void structural(void)
 
     printf("\n");
 
-    for (int n = 0; n < node_count; ++n)
+    for (int n = 0; n < frame->node_count; ++n)
     {
         printf("Node %i Force: (%2.2f, %2.2f, %2.2f), Moment: (%2.2f, %2.2f, %2.2f)\n", n,
             forces[n * dof_per_node],
@@ -437,11 +303,155 @@ void structural(void)
         );
     }
 
-
+    // Cleanup
     free(forces);
     free(displacements);
-
+    free(k_boundary);
     free(k_global);
-    free(nodes);
-    free(elements);
+}
+
+void frame_init(struct Frame* frame)
+{
+    // Material properties for 1040 mild steel annealed (13 C)
+    frame->elastic_modulus = 200.f; // GPa
+    frame->shear_modulus = 80.f; // GPa
+    frame->yield_strength = 0.415f; // GPa, 415 MPa
+
+    /* frame->elastic_modulus = 1.f; // GPa
+    frame->shear_modulus = 1.f; // GPa
+    frame->yield_strength = 1.f; // GPa, 415 MPa */
+
+    const int radius = 1.0f;
+
+    const int dof_per_node = 6;
+
+    frame->node_count = 4;
+    frame->element_count = 3;
+
+    frame->nodes = malloc(sizeof(*frame->nodes) * frame->node_count);
+    frame->elements = malloc(sizeof(*frame->elements) * frame->element_count);
+
+    // Define node positions
+    frame->nodes[0].pos = (struct vec3){ 0.f, 0.f, 0.f };
+    frame->nodes[1].pos = (struct vec3){ -1.f, 0.f, 0.f };
+    frame->nodes[2].pos = (struct vec3){ 0.f, -1.f, 0.f };
+    frame->nodes[3].pos = (struct vec3){ 1.f, 0.f, 0.f };
+
+    // Define an element between node1 and node2
+    frame->elements[0] = (struct Element){ 0, 1, frame->elastic_modulus, frame->shear_modulus, radius };
+    frame->elements[1] = (struct Element){ 0, 2, frame->elastic_modulus, frame->shear_modulus, radius };
+    frame->elements[2] = (struct Element){ 0, 3, frame->elastic_modulus, frame->shear_modulus, radius };
+}
+
+void frame_release(struct Frame* frame)
+{
+    if (frame)
+    {
+        free(frame->nodes);
+        free(frame->elements);
+
+        frame->nodes = NULL;
+        frame->elements = NULL;
+    }
+}
+
+void frame_create_mesh(struct Frame* frame, struct Mesh* mesh)
+{
+    mesh->vertices_length = frame->node_count;
+    mesh->vertices = malloc(sizeof(*mesh->vertices) * mesh->vertices_length);
+
+    mesh->indices_length = 3 * frame->element_count;
+    mesh->indices = malloc(sizeof(*mesh->indices) * mesh->indices_length);
+
+
+    // Make a vertex for each node 
+    // scaling between blue and red for x displacement
+    for (int i = 0; i < frame->node_count; ++i)
+    {
+        float x = frame->nodes[i].displacement.x;
+
+        float r;
+        float g;
+        float b;
+
+        if (x > 0.f)
+        {
+            r = x;
+            g = 1.f - x;
+            b = 0.f;
+        }
+        else
+        {
+            r = 0.f;
+            g = 1.f - x;
+            b = x;
+        }
+
+
+        mesh->vertices[i] = (struct Vertex){
+            frame->nodes[i].pos.x,
+            frame->nodes[i].pos.y,
+            frame->nodes[i].pos.z,
+            r, g, b
+        };
+    }
+
+    // Add a "triangle" for each element to draw as an edge
+    for (int i = 0; i < frame->element_count; ++i)
+    {
+        mesh->indices[3 * i] = frame->elements[i].node1;
+        mesh->indices[3 * i + 1] = frame->elements[i].node2;
+        mesh->indices[3 * i + 2] = frame->elements[i].node2;
+    }
+}
+
+
+void transform_element_stiffness(float* k_local, struct mat3 transform)
+{
+    // The stiffness matrix is 6x6 while the transform is only 3x3
+    // Mathematically this is dealt with by composing one large transform
+    // matrix by copying the transform along the diagonal
+
+    // In this case we only need a 6x6 transform so only two copies would need to be used
+    // instead we can break up the stiffness matrix into 4 quadrants transform each and compose
+    // the transformed matrix from them
+
+    // The inverse of the transformation matrix is its transpose
+    struct mat3 transinv = mat3_transpose(transform);
+
+    // Break the 6x6 stiffness into 4 3x3 quadrants
+    struct mat3 quads[4];
+    mat6_break_quads(k_local, quads);
+
+    for (int i = 0; i < 4; ++i)
+    {
+        // post multiply each quad by transform
+        struct mat3 kt = mat3_multiply(quads[i], transform);
+
+        // Pre multiply te result by inverse transform
+        struct mat3 ikt = mat3_multiply(transinv, quads[i]);
+    }
+
+    // Copy the transformed quadrants into the full local stiffness matrix
+    mat6_join_quads(k_local, quads);
+}
+
+void add_element_stiffness(float* k_global, float* k_element, struct mat3 transform, int node1, int node2, int node_count)
+{
+    // Use the transformation matrix to transform the element stiffness matrix from local to global frame
+    transform_element_stiffness(k_element, transform);
+
+    // Add the element stiffness contribution to the global stiffness matrix
+    int offset = 6 * node1 + 36 * (node2 * node_count);
+    for (int j = 0; j < 6; ++j)
+    {
+        for (int i = 0; i < 6; ++i)
+        {
+            int element_idx = i + j * 6;
+
+            int global_idx = i + offset + j * 6 * node_count;
+
+            k_global[global_idx] += k_element[element_idx];
+        }
+    }
 }

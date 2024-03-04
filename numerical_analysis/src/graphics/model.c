@@ -25,6 +25,10 @@ void model_init(struct Model* model, struct Mesh* mesh)
     // Generate and bind a Vertex Array Object (to store attributes)
     // While bound, Vertex Array Object stores information about the bound Vertex Buffer Object
     // as calls are made to modify properties on the VBO
+
+    unsigned int obj = model->vertex_array_obj;
+    unsigned int* pobj = &obj;
+
     glGenVertexArrays(1, &model->vertex_array_obj);
     glBindVertexArray(model->vertex_array_obj);
 
@@ -108,18 +112,17 @@ void model_draw(struct Model* model, unsigned int transform_id)
     }
 }
 
-void model_release(struct Model** model)
+void model_release(struct Model* model)
 {
-    if (!*model)
+    if (!model)
     {
         return;
     }
 
-    glDeleteBuffers(1, &(*model)->vertex_array_obj);
-    glDeleteBuffers(1, &(*model)->vertex_buffer_obj);
-    glDeleteBuffers(1, &(*model)->element_buffer_obj);
+    glDeleteBuffers(1, &model->vertex_array_obj);
+    glDeleteBuffers(1, &model->vertex_buffer_obj);
+    glDeleteBuffers(1, &model->element_buffer_obj);
 
-    mesh_release(&(*model)->mesh);
-
-    *model = NULL;
+    // Model is not responsible for the lifetime of the mesh since they may be shared
+    model->mesh = NULL;
 }

@@ -15,4 +15,4 @@ struct Mesh
     unsigned int indices_length;
 };
 
-void mesh_release(struct Mesh** mesh);
+void mesh_release(struct Mesh* mesh);

@@ -19,4 +19,4 @@ void model_init(struct Model* model, struct Mesh* mesh);
 
 void model_draw(struct Model* model, unsigned int transform_id);
 
-void model_release(struct Model** model);
+void model_release(struct Model* model);

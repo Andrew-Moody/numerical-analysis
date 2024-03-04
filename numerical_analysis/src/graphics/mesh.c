@@ -2,15 +2,13 @@
 
 #include <stdlib.h>
 
-void mesh_release(struct Mesh** mesh)
+void mesh_release(struct Mesh* mesh)
 {
-    if (!*mesh)
+    if (!mesh)
     {
         return;
     }
 
-    free((*mesh)->vertices);
-    free((*mesh)->indices);
-    free(*mesh);
-    *mesh = NULL;
+    free(mesh->vertices);
+    free(mesh->indices);
 }

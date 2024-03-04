@@ -155,14 +155,14 @@ static inline struct mat4 mat4_translation(float x, float y, float z)
 
 static inline struct mat4 mat4_scale(float x, float y, float z)
 {
-    struct mat4 translation = {
+    struct mat4 scale = {
         x, 0, 0, 0,
         0, y, 0, 0,
         0, 0, z, 0,
         0, 0, 0, 1
     };
 
-    return translation;
+    return scale;
 }
 
 static inline struct mat4 mat4_transform(float px, float py, float pz, float rx, float ry, float rz, float sx, float sy, float sz)

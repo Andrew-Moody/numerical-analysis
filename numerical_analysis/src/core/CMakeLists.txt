@@ -4,6 +4,9 @@ target_sources(numerical_analysis
     PRIVATE
         transform.h
         vector.h
+        matrix.h
+        linearsolve.h
+        linearsolve.c
 )
 
 target_include_directories(numerical_analysis
