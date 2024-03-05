@@ -22,12 +22,30 @@ struct Element
     float radius;
 };
 
+enum BoundaryKind
+{
+    BC_Default = 0,
+    BC_Force,
+    BC_Moment,
+    BC_Displacement,
+    BC_Rotation
+};
+
+struct BoundaryCondition
+{
+    int node; // The node the condition applies to
+    enum BoundaryKind kind; // What property the boundary condition applies to (force, displacement, etc.)
+    struct vec3 value; // The value of the property being fixed
+};
+
 struct Frame
 {
     struct Node* nodes;
     struct Element* elements;
+    struct BoundaryCondition* bconditions;
     int node_count;
     int element_count;
+    int bc_count;
 
     // Material properties
     float elastic_modulus; // GPa
@@ -35,7 +53,6 @@ struct Frame
     float yield_strength; // GPa
 };
 
-//void structural(void);
 
 void frame_solve(struct Frame* frame);
 

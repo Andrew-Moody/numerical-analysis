@@ -1,5 +1,7 @@
 #pragma once
 
+#include <stdio.h>
+
 #include "vector.h"
 
 struct mat3
@@ -94,12 +96,29 @@ static inline void mat6_transpose(float* mat)
     matrix_transpose(mat, 6);
 }
 
+static inline void matrix_print(float* mat, int rows, int cols)
+{
+    for (int j = 0; j < rows; ++j)
+    {
+        for (int i = 0; i < cols; ++i)
+        {
+            printf("%2.f ", mat[i + j * cols]);
+        }
+
+        printf("\n");
+    }
+
+    printf("\n");
+}
+
 // Break a 6x6 matrix into its 3x3 quadrants
 static inline void mat6_break_quads(float* mat, struct mat3* quads)
 {
+    printf("Breaking Quads\n\n");
+
     for (int q = 0; q < 4; ++q)
     {
-        int offset = 3 * q % 2 + 18 * q / 2;
+        int offset = 3 * (q % 2) + 18 * (q / 2);
 
         for (int j = 0; j < 3; ++j)
         {
@@ -108,15 +127,20 @@ static inline void mat6_break_quads(float* mat, struct mat3* quads)
                 quads[q].elements[i + 3 * j] = mat[offset + i + 6 * j];
             }
         }
+
+        printf("Quad %i\n", q);
+        matrix_print(quads[q].elements, 3, 3);
     }
 }
 
 // Join 3x3 quadrants into a single 6x6 matrix
 static inline void mat6_join_quads(float* mat, struct mat3* quads)
 {
+    printf("Joining Quads\n\n");
+
     for (int q = 0; q < 4; ++q)
     {
-        int offset = 3 * q % 2 + 18 * q / 2;
+        int offset = 3 * (q % 2) + 18 * (q / 2);
 
         for (int j = 0; j < 3; ++j)
         {

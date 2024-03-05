@@ -20,7 +20,8 @@ int main(void)
     // Render a grid, or imported STL mesh
     struct Mesh mesh;
     struct Model model;
-    //create_sample_stl(&mesh, &model);
+    //create_sample_stl(&mesh, &model, "../../models/orientation.stl");
+    create_sample_stl(&mesh, &model, "../../models/3DBenchy.stl");
     //create_sample_grid(&mesh, &model);
 
 
@@ -31,8 +32,8 @@ int main(void)
     frame_solve(&frame);
 
     // Create a renderable mesh representation of the frame
-    frame_create_mesh(&frame, &mesh);
-    create_model_from_mesh(&mesh, &model);
+    //frame_create_mesh(&frame, &mesh);
+    //create_model_from_mesh(&mesh, &model);
 
     render_model(window, &model);
 

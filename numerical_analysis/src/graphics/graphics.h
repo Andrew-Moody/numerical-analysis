@@ -6,7 +6,7 @@ struct GLFWwindow;
 
 void create_sample_grid(struct Mesh* mesh, struct Model* model);
 
-void create_sample_stl(struct Mesh* mesh, struct Model* model);
+void create_sample_stl(struct Mesh* mesh, struct Model* model, const char* path);
 
 void create_model_from_mesh(struct Mesh* mesh, struct Model* model);
 

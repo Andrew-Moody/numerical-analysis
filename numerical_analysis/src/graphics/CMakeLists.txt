@@ -8,12 +8,16 @@ target_sources(numerical_analysis
         import.c
         shader.c
         camera.c
+        input.c
+        application.c
         graphics.h
         mesh.h
         model.h
         import.h
         shader.h
         camera.h
+        input.h
+        application.h
 )
 
 target_include_directories(numerical_analysis
