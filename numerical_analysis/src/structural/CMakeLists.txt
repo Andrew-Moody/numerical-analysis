@@ -4,6 +4,8 @@ target_sources(numerical_analysis
     PRIVATE
         frame.h
         frame.c
+        frameimport.h
+        frameimport.c
 )
 
 target_include_directories(numerical_analysis

@@ -302,10 +302,6 @@ void frame_init(struct Frame* frame)
     frame->shear_modulus = 80.f; // GPa
     frame->yield_strength = 0.415f; // GPa, 415 MPa
 
-    /* frame->elastic_modulus = 1.f; // GPa
-    frame->shear_modulus = 1.f; // GPa
-    frame->yield_strength = 1.f; // GPa, 415 MPa */
-
     const int radius = 1.0f;
 
     // Four nodes
@@ -347,68 +343,6 @@ void frame_init(struct Frame* frame)
     frame->bconditions[0].node = 0;
     frame->bconditions[0].kind = BC_Force;
     frame->bconditions[0].value = (struct vec3){ 700.f, 0.f, 0.f };
-
-    // Three nodes
-    /* frame->node_count = 3;
-    frame->element_count = 2;
-    frame->bc_count = 3;
-
-    frame->nodes = malloc(sizeof(*frame->nodes) * frame->node_count);
-    frame->elements = malloc(sizeof(*frame->elements) * frame->element_count);
-    frame->bconditions = malloc(sizeof(*frame->bconditions) * frame->bc_count);
-
-    // Define node positions
-    frame->nodes[0].pos = (struct vec3){ 0.f, 0.f, 0.f };
-    frame->nodes[1].pos = (struct vec3){ -1.f, 0.f, 0.f };
-    frame->nodes[2].pos = (struct vec3){ 0.f, -1.f, 0.f };
-
-    // Define an element between node1 and node2
-    frame->elements[0] = (struct Element){ 1, 0, frame->elastic_modulus, frame->shear_modulus, radius };
-    frame->elements[1] = (struct Element){ 2, 0, frame->elastic_modulus, frame->shear_modulus, radius };
-
-    // Define boundary conditions
-
-    // Fixed position at nodes 1 and 2 (but not rotation)
-    frame->bconditions[0].node = 1;
-    frame->bconditions[0].kind = BC_Displacement;
-    frame->bconditions[0].value = (struct vec3){ 0.f, 0.f, 0.f };
-
-    frame->bconditions[1].node = 2;
-    frame->bconditions[1].kind = BC_Displacement;
-    frame->bconditions[1].value = (struct vec3){ 0.f, 0.f, 0.f };
-
-    // Applied force at node 0
-    frame->bconditions[2].node = 0;
-    frame->bconditions[2].kind = BC_Force;
-    frame->bconditions[2].value = (struct vec3){ 500.f, 500.f, 0.f }; */
-
-    // Two nodes
-    /* frame->node_count = 2;
-    frame->element_count = 1;
-    frame->bc_count = 2;
-
-    frame->nodes = malloc(sizeof(*frame->nodes) * frame->node_count);
-    frame->elements = malloc(sizeof(*frame->elements) * frame->element_count);
-    frame->bconditions = malloc(sizeof(*frame->bconditions) * frame->bc_count);
-
-    // Define node positions
-    frame->nodes[0].pos = (struct vec3){ 0.f, 0.f, 0.f };
-    frame->nodes[1].pos = (struct vec3){ 0.f, -1.f, 0.f };
-
-    // Define an element between node1 and node2
-    frame->elements[0] = (struct Element){ 1, 0, frame->elastic_modulus, frame->shear_modulus, radius };
-
-    // Define boundary conditions
-
-    // Fixed position at node 1 (but not rotation)
-    frame->bconditions[0].node = 1;
-    frame->bconditions[0].kind = BC_Displacement;
-    frame->bconditions[0].value = (struct vec3){ 0.f, 0.f, 0.f };
-
-    // Applied force at node 0
-    frame->bconditions[1].node = 0;
-    frame->bconditions[1].kind = BC_Force;
-    frame->bconditions[1].value = (struct vec3){ 0.f, 500.f, 0.f }; */
 }
 
 void frame_release(struct Frame* frame)
@@ -437,12 +371,14 @@ void frame_create_mesh(struct Frame* frame, struct Mesh* mesh)
     for (int i = 0; i < frame->node_count; ++i)
     {
         float x = frame->nodes[i].displacement.x;
+        float y = frame->nodes[i].displacement.y;
+        float z = frame->nodes[i].displacement.z;
 
         float r;
         float g;
         float b;
 
-        if (x > 0.f)
+        /* if (x > 0.f)
         {
             r = x;
             g = 1.f - x;
@@ -451,8 +387,21 @@ void frame_create_mesh(struct Frame* frame, struct Mesh* mesh)
         else
         {
             r = 0.f;
-            g = 1.f - x;
-            b = x;
+            g = 1.f + x;
+            b = -x;
+        } */
+
+        if (y > 0.f)
+        {
+            r = y;
+            g = 1.f - y;
+            b = 0.f;
+        }
+        else
+        {
+            r = 0.f;
+            g = 1.f + y;
+            b = -y;
         }
 
 
@@ -550,7 +499,12 @@ void apply_boundary_conditions(struct Frame* frame, float* stiffness, float* for
                 frame->bconditions[n].value.y != 0.f ||
                 frame->bconditions[n].value.z != 0.f)
             {
-                printf("Warning: Non-homogeneous boundary conditions applied");
+
+                float x = frame->bconditions[n].value.x;
+                float y = frame->bconditions[n].value.y;
+                float z = frame->bconditions[n].value.z;
+
+                printf("Warning: Non-homogeneous boundary conditions applied: (%f, %f, %f\n", x, y, z);
                 continue;
             }
 

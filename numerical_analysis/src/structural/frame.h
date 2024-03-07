@@ -56,6 +56,7 @@ struct Frame
 
 void frame_solve(struct Frame* frame);
 
+// Creates a hardcoded frame for testing. Use frame_import instead to load from a file
 void frame_init(struct Frame* frame);
 
 void frame_release(struct Frame* frame);
