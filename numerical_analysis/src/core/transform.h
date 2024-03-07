@@ -128,10 +128,12 @@ static inline struct mat4 mat4_rotation(float x, float y, float z)
         0, 0, 0, 1 */
     };
 
+    // Order here was incorrect must be z * y * x not x * y * z
+    /* struct mat4 rotxy = mat4_multiply(rotx, roty);
+    struct mat4 rotation = mat4_multiply(rotxy, rotz); */
 
-    struct mat4 rotxy = mat4_multiply(rotx, roty);
-
-    struct mat4 rotation = mat4_multiply(rotxy, rotz);
+    struct mat4 rotzy = mat4_multiply(rotz, roty);
+    struct mat4 rotation = mat4_multiply(rotzy, rotx);
 
     return rotation;
 }

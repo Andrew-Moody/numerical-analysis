@@ -20,8 +20,8 @@ int main(void)
     // Render a grid, or imported STL mesh
     struct Mesh mesh;
     struct Model model;
-    //create_sample_stl(&mesh, &model, "../../models/orientation.stl");
-    create_sample_stl(&mesh, &model, "../../models/3DBenchy.stl");
+    create_sample_stl(&mesh, &model, "../../models/orientation.stl");
+    //create_sample_stl(&mesh, &model, "../../models/3DBenchy.stl");
     //create_sample_grid(&mesh, &model);
 
 

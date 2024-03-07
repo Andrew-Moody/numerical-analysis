@@ -39,13 +39,13 @@ void create_sample_stl(struct Mesh* mesh, struct Model* model, const char* path)
     printf("vert length: %i, index length: %i\n", mesh->vertices_length, mesh->indices_length);
 
     model_init(model, mesh);
-    //model->transform = mat4_transform(0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 1.f, 1.f, 1.f);
+    model->transform = mat4_transform(0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 1.f, 1.f, 1.f);
     model->cull_backface = GL_FALSE;
     model->draw_wireframe = GL_TRUE;
 
     // Benchy model is too big to fit on screen unless perspective projection is used
     // also needs to be rotated and shifted down to center on the screen
-    model->transform = mat4_transform(0.0f, -0.5f, 0.0f, -90.0f, 0.0f, 0.0f, 0.025f, 0.025f, 0.025f);
+    //model->transform = mat4_transform(0.0f, -0.5f, 0.0f, -90.0f, 0.0f, 0.0f, 0.025f, 0.025f, 0.025f);
 }
 
 void create_model_from_mesh(struct Mesh* mesh, struct Model* model)
@@ -80,8 +80,6 @@ void render_model(struct GLFWwindow* window, struct Model* model)
     // Get the id for the projection matrix
     application.proj_matrix_id = glGetUniformLocation(shader, "projection");
 
-    glUniformMatrix4fv(application.proj_matrix_id, 1, GL_FALSE, (float*)&(application.camera->proj_matrix));
-
     input_init(window);
 
     // Process Input and Rendering commands until a close event is recieved
@@ -89,7 +87,10 @@ void render_model(struct GLFWwindow* window, struct Model* model)
     {
         // Check input
         glfwPollEvents();
-        //process_input(window);
+        process_input(window);
+
+        camera_update(application.camera);
+        glUniformMatrix4fv(application.proj_matrix_id, 1, GL_FALSE, (float*)&(application.camera->view_transform));
 
         // Clear the screen for more drawing
         glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
