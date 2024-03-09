@@ -27,7 +27,10 @@ int main(void)
 
     // Load nodes, elements and boundary conditions from file
     struct Frame frame;
-    if (frame_import("../../models/bicycle.frame", &frame) != 0)
+    //const char* path = "../../models/beam.frame";
+    //const char* path = "../../models/bicycle.frame";
+    const char* path = "../../models/car.frame";
+    if (frame_import(path, &frame) != 0)
     {
         return -1;
     }

@@ -31,7 +31,7 @@ void solve_jacobi(float* matrix_a, float* vector_x, float* vector_b, int rows, i
     else if (desired_threads == 1)
     {
         // Single threaded only
-        for (int t = 0; t < 10; ++t)
+        for (int t = 0; t < iterations; ++t)
         {
             // update one row at a time
             for (int j = 0; j < rows; ++j)
@@ -65,7 +65,8 @@ void solve_jacobi(float* matrix_a, float* vector_x, float* vector_b, int rows, i
     {
         // Multi-threaded
 #pragma omp parallel num_threads(desired_threads)
-        for (int t = 0; t < 10; ++t)
+        // for (int t = 0; t < 10; ++t) dohh
+        for (int t = 0; t < iterations; ++t)
         {
             // update multiple rows at a time
 #pragma omp for schedule(dynamic) nowait

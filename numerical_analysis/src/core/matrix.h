@@ -102,7 +102,7 @@ static inline void matrix_print(float* mat, int rows, int cols)
     {
         for (int i = 0; i < cols; ++i)
         {
-            printf("%2.f ", mat[i + j * cols]);
+            printf("%3.f ", mat[i + j * cols]);
         }
 
         printf("\n");
