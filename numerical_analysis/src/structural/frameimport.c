@@ -1,19 +1,27 @@
 #include "frameimport.h"
 
-#include "stdlib.h"
-#include "stdio.h"
-#include "string.h"
+#include <stdlib.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
 
+#include "filepath.h"
 #include "frame.h"
 
-int frame_import(const char* path, struct Frame* frame)
+int frame_import(const char* filename, struct Frame* frame)
 {
+    // Get the full filepath looking for a file (or filepath) relative to repo/models/
+    char* path = get_full_filepath(filename, "models/");
+
     // Typical file handling
     FILE* file = fopen(path, "r");
 
+    // Free the path string regardless of success 
+    free(path);
+
     if (!file)
     {
-        fprintf(stderr, "Failed to open file at: %s\n", path);
+        fprintf(stderr, "Failed to open file at: %s\n", filename);
         return -1;
     }
 

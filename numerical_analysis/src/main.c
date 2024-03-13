@@ -7,9 +7,14 @@
 #include "mesh.h"
 #include "model.h"
 #include "frameimport.h"
+#include "mpitest.h"
 
-int main(void)
+
+int main(int argc, char* argv[])
 {
+
+    mpi_test(&argc, &argv);
+
     //finiteDifference1D();
     //finiteDifference2D();
 
@@ -20,19 +25,23 @@ int main(void)
     // Render a grid, or imported STL mesh
     struct Mesh mesh;
     struct Model model;
-    //create_sample_stl(&mesh, &model, "../../models/orientation.stl");
-    //create_sample_stl(&mesh, &model, "../../models/3DBenchy.stl");
+    // Specify filepaths relative to [repository]/models/
+    //create_sample_stl(&mesh, &model, "orientation.stl");
+    //create_sample_stl(&mesh, &model, "3DBenchy.stl");
     //create_sample_grid(&mesh, &model);
 
 
     // Load nodes, elements and boundary conditions from file
     struct Frame frame;
-    //const char* path = "../../models/beam.frame";
-    //const char* path = "../../models/bicycle.frame";
-    const char* path = "../../models/car.frame";
-    if (frame_import(path, &frame) != 0)
+    // Specify filepaths relative to [repository]/models/
+    //const char* filename = "beam.frame";
+    //const char* filename = "bicycle.frame";
+    const char* filename = "car.frame";
+
+    if (frame_import(filename, &frame))
     {
-        return -1;
+        graphics_shutdown(&window);
+        return 1;
     }
 
     // Solve linear equation using iterative method

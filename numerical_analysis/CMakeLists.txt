@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 3.13)
 
-add_executable(numerical_analysis "")
+#add_executable(${MAIN_TARGET_NAME} "")
 
-target_sources(numerical_analysis
+target_sources(${MAIN_TARGET_NAME}
     PRIVATE
         src/main.c
 )

@@ -16,6 +16,7 @@
 #include "grid.h"
 #include "transform.h"
 #include "camera.h"
+#include "filepath.h"
 
 
 void create_sample_grid(struct Mesh* mesh, struct Model* model)
@@ -31,10 +32,14 @@ void create_sample_grid(struct Mesh* mesh, struct Model* model)
     model->draw_wireframe = GL_TRUE;
 }
 
-void create_sample_stl(struct Mesh* mesh, struct Model* model, const char* path)
+void create_sample_stl(struct Mesh* mesh, struct Model* model, const char* filename)
 {
+    // Get the full filepath looking for a file (or filepath) relative to repo/models/
+    char* path = get_full_filepath(path, "models/");
+
     // Load a mesh from STL file
     load_stl(path, mesh);
+    free(path);
 
     printf("vert length: %i, index length: %i\n", mesh->vertices_length, mesh->indices_length);
 
