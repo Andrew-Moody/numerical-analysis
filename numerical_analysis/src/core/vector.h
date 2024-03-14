@@ -1,6 +1,13 @@
 #pragma once
 
+#include <stdlib.h>
 #include <math.h>
+
+struct vecf
+{
+    float* elements;
+    int count;
+};
 
 struct vec3
 {
@@ -70,4 +77,25 @@ static inline struct vec3 vec3_cross(struct vec3 vec1, struct vec3 vec2)
     };
 
     return cross;
+}
+
+static inline void vecf_init(struct vecf* vec, int count)
+{
+    vec->count = count;
+    vec->elements = malloc(sizeof(*vec->elements) * count);
+}
+
+static inline void vecf_release(struct vecf* vec)
+{
+    free(vec->elements);
+    vec->elements = NULL;
+    vec->count = 0;
+}
+
+static inline void vecf_fill(struct vecf* vec, float value)
+{
+    for (int i = 0; i < vec->count; ++i)
+    {
+        vec->elements[i] = value;
+    }
 }

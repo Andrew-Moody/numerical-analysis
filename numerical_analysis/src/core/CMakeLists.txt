@@ -10,6 +10,10 @@ target_sources(${MAIN_TARGET_NAME}
         linearsolve.h
         linearsolve.c
         mpitest.h
+        mpiutility.h
+        mpiutility.c
+        linsolvempi.h
+        linsolvempi.c
 )
 
 target_include_directories(${MAIN_TARGET_NAME}

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "vector.h"
+#include "matrix.h"
 
 struct Mesh;
 
@@ -59,11 +60,27 @@ struct Frame
     int bc_count;
 };
 
-// Solve the linear equation representing the frame using an iterative method
+struct EquationSet
+{
+    struct Matrix stiffness;
+    struct Matrix stiff_bc;
+    struct vecf forces;
+    struct vecf displacements;
+};
+
+// Build a set of matrices and vectors representing the problem
+void frame_build_equations(struct Frame* frame, struct EquationSet* eqset);
+
+// Solve the linear equation representing the frame using an iterative method with OpenMP
 void frame_solve(struct Frame* frame);
+
+// Populate per node properties using displacements to back calculate forces
+void frame_update_results(struct Frame* frame, struct EquationSet* eqset);
 
 // Frees resources held by the frame
 void frame_release(struct Frame* frame);
 
 // Create a graphical mesh representation of the frame
 void frame_create_mesh(struct Frame* frame, struct Mesh* mesh);
+
+void equationset_release(struct EquationSet* eqset);

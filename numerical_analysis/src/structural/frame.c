@@ -13,30 +13,35 @@
 #define DOF 6
 
 // Forward Declarations
-void transform_element_stiffness(float* k_local, struct mat3 transform);
-void add_element_stiffness(float* k_global, float* k_element, struct mat3 transform, int node1, int node2, int node_count);
-void apply_boundary_conditions(struct Frame* frame, float* stiffness, float* forces, int side_length);
+void build_stiffness(struct Frame* frame, struct Matrix* k_global);
+void transform_element_stiffness(struct mat6* k_local, struct mat3 transform);
+void add_element_stiffness(struct Matrix* k_global, struct mat6* k_element, struct mat3 transform, int node1, int node2, int node_count);
+void apply_boundary_conditions(struct Frame* frame, struct Matrix* stiffness, struct vecf* forces);
 
-void frame_solve(struct Frame* frame)
+void frame_build_equations(struct Frame* frame, struct EquationSet* eqset)
 {
     int dof_count = DOF * frame->node_count;
 
-    // Alocate memory and initialize to zero for the forces, displacements, and stiffness matrix
-    float* k_global = malloc(sizeof(*k_global) * dof_count * dof_count);
+    build_stiffness(frame, &eqset->stiffness);
 
-    for (int i = 0; i < dof_count * dof_count; ++i)
-    {
-        k_global[i] = 0;
-    }
+    // Alocate and fill vectors for force and displacement
+    vecf_init(&eqset->forces, dof_count);
+    vecf_fill(&eqset->forces, 0.0f);
+    vecf_init(&eqset->displacements, dof_count);
+    vecf_fill(&eqset->displacements, 0.0f);
 
-    float* displacements = malloc(sizeof(*displacements) * dof_count);
-    float* forces = malloc(sizeof(*forces) * dof_count);
+    // Copy stiffness before appling boundary conditions
+    matrix_copy(&eqset->stiff_bc, &eqset->stiffness);
 
-    for (int i = 0; i < dof_count; ++i)
-    {
-        displacements[i] = 0.f;
-        forces[i] = 0.f;
-    }
+    // Modify the copied stiffness matrix to reflect the boundary conditions
+    apply_boundary_conditions(frame, &eqset->stiff_bc, &eqset->forces);
+}
+
+void build_stiffness(struct Frame* frame, struct Matrix* k_global)
+{
+    int dof_count = DOF * frame->node_count;
+
+    matrix_init(k_global, dof_count, dof_count, 1);
 
     // Add each elements contribution to the stiffness matrix
     for (int element_idx = 0; element_idx < frame->element_count; ++element_idx)
@@ -53,7 +58,7 @@ void frame_solve(struct Frame* frame)
         const float g = frame->elements[element_idx].shear_modulus * 1000000000;
         const float r = frame->elements[element_idx].radius;
 
-        printf("Elastic: %f, Shear: %f, Radius %f, Length %f\n", e, g, r, length);
+        //printf("Elastic: %f, Shear: %f, Radius %f, Length %f\n", e, g, r, length);
 
         // Cross sectional area
         const float area = r * r * 3.14159f;
@@ -74,9 +79,9 @@ void frame_solve(struct Frame* frame)
         const float ei_z = e * inertia_z;
         const float gj = g * inertia_x;
 
-        printf("Ix: %.12f, Iy: %.12f, Iz: %.12f\n", inertia_x, inertia_y, inertia_z);
+        /* printf("Ix: %.12f, Iy: %.12f, Iz: %.12f\n", inertia_x, inertia_y, inertia_z);
 
-        printf("Ix: %.12f, Iy: %.12f, Iz: %.12f\n", gj, ei_y, ei_z);
+        printf("Ix: %.12f, Iy: %.12f, Iz: %.12f\n", gj, ei_y, ei_z); */
 
         // Axial Stiffness (for tension/compression along axis)
         const float k = e * area / length;
@@ -93,7 +98,7 @@ void frame_solve(struct Frame* frame)
 
         // General stiffness matrices for beams (fixed joints) that include
         // bending about y and z and torsion about x along with axial stiffness
-        float k11[36] = {
+        struct mat6 k11[36] = {
             k, 0, 0, 0, 0, 0,
             0, (12 * ei_z / l3), 0, 0, 0, (6 * ei_z / l2),
             0, 0, (12 * ei_y / l3), 0, -(6 * ei_y / l2), 0,
@@ -102,7 +107,7 @@ void frame_solve(struct Frame* frame)
             0, (6 * ei_z / l2), 0, 0, 0, (4 * ei_z / length)
         };
 
-        float k12[36] = {
+        struct mat6 k12[36] = {
             -k, 0, 0, 0, 0, 0,
             0, -(12 * ei_z / l3), 0, 0, 0, (6 * ei_z / l2),
             0, 0, -(12 * ei_y / l3), 0, -(6 * ei_y / l2), 0,
@@ -111,7 +116,7 @@ void frame_solve(struct Frame* frame)
             0, -(6 * ei_z / l2), 0, 0, 0, (2 * ei_z / length)
         };
 
-        float k21[36] = {
+        struct mat6 k21[36] = {
             -k, 0, 0, 0, 0, 0,
             0, -(12 * ei_z / l3), 0, 0, 0, -(6 * ei_z / l2),
             0, 0, -(12 * ei_y / l3), 0, (6 * ei_y / l2), 0,
@@ -120,7 +125,7 @@ void frame_solve(struct Frame* frame)
             0, (6 * ei_z / l2), 0, 0, 0, (2 * ei_z / length)
         };
 
-        float k22[36] = {
+        struct mat6 k22[36] = {
             k, 0, 0, 0, 0, 0,
             0, (12 * ei_z / l3), 0, 0, 0, -(6 * ei_z / l2),
             0, 0, (12 * ei_y / l3), 0, (6 * ei_y / l2), 0,
@@ -130,7 +135,7 @@ void frame_solve(struct Frame* frame)
         };
 
         // Axial stiffness only for trusses (pinned-joints that are free to rotate)
-        /* float k11[36] = {
+        /* struct mat6 k11[36] = {
             k, 0, 0, 0, 0, 0,
             0, 0, 0, 0, 0, 0,
             0, 0, 0, 0, 0, 0,
@@ -139,7 +144,7 @@ void frame_solve(struct Frame* frame)
             0, 0, 0, 0, 0, 0,
         };
 
-        float k12[36] = {
+        struct mat6 k12[36] = {
             -k, 0, 0, 0, 0, 0,
             0, 0, 0, 0, 0, 0,
             0, 0, 0, 0, 0, 0,
@@ -148,7 +153,7 @@ void frame_solve(struct Frame* frame)
             0, 0, 0, 0, 0, 0,
         };
 
-        float k21[36] = {
+        struct mat6 k21[36] = {
             -k, 0, 0, 0, 0, 0,
             0, 0, 0, 0, 0, 0,
             0, 0, 0, 0, 0, 0,
@@ -157,7 +162,7 @@ void frame_solve(struct Frame* frame)
             0, 0, 0, 0, 0, 0,
         };
 
-        float k22[36] = {
+        struct mat6 k22[36] = {
             k, 0, 0, 0, 0, 0,
             0, 0, 0, 0, 0, 0,
             0, 0, 0, 0, 0, 0,
@@ -167,7 +172,7 @@ void frame_solve(struct Frame* frame)
         }; */
 
 
-        printf("k11:\n");
+        /* printf("k11:\n");
         matrix_print(k11, 6, 6);
 
         printf("k12:\n");
@@ -177,7 +182,7 @@ void frame_solve(struct Frame* frame)
         matrix_print(k21, 6, 6);
 
         printf("k22:\n");
-        matrix_print(k22, 6, 6);
+        matrix_print(k22, 6, 6); */
 
         // The stiffness matrices above assume the element is lying in the global reference frame
         // with the length oriented along the global x axis
@@ -250,9 +255,9 @@ void frame_solve(struct Frame* frame)
         };
 
 
-        printf("x_axis: %2.f, %2.f, %2.f\n", x_axis.x, x_axis.y, x_axis.z);
+        /* printf("x_axis: %2.f, %2.f, %2.f\n", x_axis.x, x_axis.y, x_axis.z);
         printf("y_axis: %2.f, %2.f, %2.f\n", y_axis.x, y_axis.y, y_axis.z);
-        printf("z_axis: %2.f, %2.f, %2.f\n\n", z_axis.x, z_axis.y, z_axis.z);
+        printf("z_axis: %2.f, %2.f, %2.f\n\n", z_axis.x, z_axis.y, z_axis.z); */
 
         // Add the local contributions to the global stiffness matrix
         add_element_stiffness(k_global, k11, transform, node1, node1, frame->node_count);
@@ -264,17 +269,19 @@ void frame_solve(struct Frame* frame)
 
     //printf("Global Stiffness Matrix\n");
     //matrix_print(k_global, dof_count, dof_count);
+}
 
+void frame_solve(struct Frame* frame)
+{
+    struct EquationSet eqset;
 
-    // Need to make a copy of k_global before modifying it to add boundary conditions as it will be used later
-    float* k_boundary = malloc(sizeof(*k_boundary) * dof_count * dof_count);
+    frame_build_equations(frame, &eqset);
 
-    for (int i = 0; i < dof_count * dof_count; ++i)
-    {
-        k_boundary[i] = k_global[i];
-    }
-
-    apply_boundary_conditions(frame, k_boundary, forces, dof_count);
+    // For convenience
+    struct Matrix* stiffness = &eqset.stiffness;
+    struct Matrix* stiff_bc = &eqset.stiff_bc;
+    struct vecf* forces = &eqset.forces;
+    struct vecf* displacements = &eqset.displacements;
 
     //printf("Force boundary conditions:\n");
     //matrix_print(forces, dof_count, 1);
@@ -284,58 +291,24 @@ void frame_solve(struct Frame* frame)
 
     // F = KU can now be solved for the displacements U = k^-1 * F
     // using the known boundary condition forces
-    solve_jacobi(k_boundary, displacements, forces, dof_count, dof_count, 100, 1);
+    int dof_count = DOF * frame->node_count;
+    solve_jacobi(eqset.stiff_bc.elements, eqset.displacements.elements,
+        eqset.forces.elements, dof_count, dof_count, 100, 1);
 
-
-    // Back calculate unknown forces now that displacements are known by multipling 
-    // the stiffness matrix times the displacement vector F = KU
-    matrix_premultiply(forces, k_global, displacements, dof_count, dof_count);
-
-    /* for (int i = 0; i < dof_count; ++i)
-    {
-        for (int c = 0; c < dof_count; ++c)
-        {
-            printf("%6.f ", k_global[c + i * dof_count] / 10000.f);
-        }
-
-        printf("   |%7.4f|   |%5.f|\n", displacements[i], forces[i]);
-    } */
-
-    //printf("Solved Forces:\n");
-    //matrix_print(forces, dof_count, 1);
-
-    // Update the frames per node properties to use for rendering and analysis
-    for (int i = 0; i < frame->node_count; ++i)
-    {
-        frame->nodes[i].force.x = forces[i * DOF];
-        frame->nodes[i].force.y = forces[i * DOF + 1];
-        frame->nodes[i].force.z = forces[i * DOF + 2];
-
-        frame->nodes[i].moment.x = forces[i * DOF + 3];
-        frame->nodes[i].moment.y = forces[i * DOF + 4];
-        frame->nodes[i].moment.z = forces[i * DOF + 5];
-
-        frame->nodes[i].displacement.x = displacements[i * DOF];
-        frame->nodes[i].displacement.y = displacements[i * DOF + 1];
-        frame->nodes[i].displacement.z = displacements[i * DOF + 2];
-
-        frame->nodes[i].rotation.y = displacements[i * DOF + 3];
-        frame->nodes[i].rotation.x = displacements[i * DOF + 4];
-        frame->nodes[i].rotation.z = displacements[i * DOF + 5];
-    }
-
+    // Populate per node properties using displacements to back calculate forces
+    frame_update_results(frame, &eqset);
 
     // Print Node displacments and forces
 
     for (int n = 0; n < frame->node_count; ++n)
     {
         printf("Node %i Displacement: (%2.3f, %2.3f, %2.3f), Rotation: (%2.3f, %2.3f, %2.3f)\n", n,
-            displacements[n * DOF],
-            displacements[n * DOF + 1],
-            displacements[n * DOF + 2],
-            displacements[n * DOF + 3],
-            displacements[n * DOF + 4],
-            displacements[n * DOF + 5]
+            displacements->elements[n * DOF],
+            displacements->elements[n * DOF + 1],
+            displacements->elements[n * DOF + 2],
+            displacements->elements[n * DOF + 3],
+            displacements->elements[n * DOF + 4],
+            displacements->elements[n * DOF + 5]
         );
     }
 
@@ -344,20 +317,56 @@ void frame_solve(struct Frame* frame)
     for (int n = 0; n < frame->node_count; ++n)
     {
         printf("Node %i Force: (%2.3f, %2.3f, %2.3f), Moment: (%2.3f, %2.3f, %2.3f)\n", n,
-            forces[n * DOF],
-            forces[n * DOF + 1],
-            forces[n * DOF + 2],
-            forces[n * DOF + 3],
-            forces[n * DOF + 4],
-            forces[n * DOF + 5]
+            forces->elements[n * DOF],
+            forces->elements[n * DOF + 1],
+            forces->elements[n * DOF + 2],
+            forces->elements[n * DOF + 3],
+            forces->elements[n * DOF + 4],
+            forces->elements[n * DOF + 5]
         );
     }
 
     // Cleanup
-    free(forces);
-    free(displacements);
-    free(k_boundary);
-    free(k_global);
+    equationset_release(&eqset);
+}
+
+
+void frame_update_results(struct Frame* frame, struct EquationSet* eqset)
+{
+    int dof_count = DOF * frame->node_count;
+
+    struct Matrix* stiffness = &eqset->stiffness;
+    struct Matrix* stiff_bc = &eqset->stiff_bc;
+    struct vecf* forces = &eqset->forces;
+    struct vecf* displacements = &eqset->displacements;
+
+    // Back calculate unknown forces now that displacements are known by multipling 
+    // the full (not boundary) stiffness matrix times the displacement vector F = KU
+    matrix_premultiply(forces->elements, stiffness->elements, displacements->elements, dof_count, dof_count);
+    //matrix_premultiply(forces, stiffness, displacements);
+
+    //printf("Solved Forces:\n");
+    //matrix_print(forces, dof_count, 1);
+
+    // Update the frames per node properties to use for rendering and analysis
+    for (int i = 0; i < frame->node_count; ++i)
+    {
+        frame->nodes[i].force.x = forces->elements[i * DOF];
+        frame->nodes[i].force.y = forces->elements[i * DOF + 1];
+        frame->nodes[i].force.z = forces->elements[i * DOF + 2];
+
+        frame->nodes[i].moment.x = forces->elements[i * DOF + 3];
+        frame->nodes[i].moment.y = forces->elements[i * DOF + 4];
+        frame->nodes[i].moment.z = forces->elements[i * DOF + 5];
+
+        frame->nodes[i].displacement.x = displacements->elements[i * DOF];
+        frame->nodes[i].displacement.y = displacements->elements[i * DOF + 1];
+        frame->nodes[i].displacement.z = displacements->elements[i * DOF + 2];
+
+        frame->nodes[i].rotation.y = displacements->elements[i * DOF + 3];
+        frame->nodes[i].rotation.x = displacements->elements[i * DOF + 4];
+        frame->nodes[i].rotation.z = displacements->elements[i * DOF + 5];
+    }
 }
 
 
@@ -439,7 +448,7 @@ void frame_create_mesh(struct Frame* frame, struct Mesh* mesh)
 }
 
 
-void transform_element_stiffness(float* k_local, struct mat3 transform)
+void transform_element_stiffness(struct mat6* k_local, struct mat3 transform)
 {
     // The stiffness matrix is 6x6 while the transform is only 3x3
     // Mathematically this is dealt with by composing one large transform
@@ -460,7 +469,7 @@ void transform_element_stiffness(float* k_local, struct mat3 transform)
 
     // Break the 6x6 stiffness into 4 3x3 quadrants
     struct mat3 quads[4];
-    mat6_break_quads(k_local, quads);
+    mat6_break_quads(k_local->elements, quads);
 
     for (int i = 0; i < 4; ++i)
     {
@@ -472,24 +481,24 @@ void transform_element_stiffness(float* k_local, struct mat3 transform)
     }
 
     // Copy the transformed quadrants into the full local stiffness matrix
-    mat6_join_quads(k_local, quads);
+    mat6_join_quads(k_local->elements, quads);
 }
 
-void add_element_stiffness(float* k_global, float* k_element, struct mat3 transform, int node1, int node2, int node_count)
+void add_element_stiffness(struct Matrix* k_global, struct mat6* k_element, struct mat3 transform, int node1, int node2, int node_count)
 {
     printf("Element stiffness for nodes %i and %i:\nLocal:\n", node1, node2);
-    matrix_print(k_element, 6, 6);
+    mat6_print(*k_element);
 
     // Use the transformation matrix to transform the element stiffness matrix from local to global frame
     transform_element_stiffness(k_element, transform);
 
     printf("Global:\n");
-    matrix_print(k_element, 6, 6);
+    mat6_print(*k_element);
 
     // Add the element stiffness contribution to the global stiffness matrix
     int offset = 6 * node2 + 36 * (node1 * node_count);
 
-    // Incorrect results in k12 and k21 swapped (3 hours later)
+    // Incorrect results in k12 and k21 being swapped (3 hours later)
     //int offset = 6 * node1 + 36 * (node2 * node_count); 
 
     for (int j = 0; j < 6; ++j)
@@ -500,13 +509,13 @@ void add_element_stiffness(float* k_global, float* k_element, struct mat3 transf
 
             int global_idx = i + offset + j * 6 * node_count;
 
-            k_global[global_idx] += k_element[element_idx];
+            k_global->elements[global_idx] += k_element->elements[element_idx];
         }
     }
 }
 
 
-void apply_displacement(int dof, float value, float* stiffness, int length)
+void apply_displacement(int dof, float value, struct Matrix* stiffness, int length)
 {
     // Set the global stiffness rows and columns for the affected degree of freedom
     // to 1 on diagonal and 0 everywhere else (setting diagonals to 1 is not strictly
@@ -519,18 +528,20 @@ void apply_displacement(int dof, float value, float* stiffness, int length)
     for (int i = 0; i < length; ++i)
     {
         // Set row to zero
-        stiffness[rowstart + i] = 0;
+        stiffness->elements[rowstart + i] = 0;
 
         //Set column to zero
-        stiffness[colstart + i * length] = 0;
+        stiffness->elements[colstart + i * length] = 0;
     }
 
     // Set diagonal to 1
-    stiffness[rowstart + colstart] = 1;
+    stiffness->elements[rowstart + colstart] = 1;
 }
 
-void apply_boundary_conditions(struct Frame* frame, float* stiffness, float* forces, int length)
+void apply_boundary_conditions(struct Frame* frame, struct Matrix* stiffness, struct vecf* forces)
 {
+    int length = DOF * frame->node_count;
+
     // Modify the stiffness matrix and force vector to reflect the boundary conditions on the frame
     for (int n = 0; n < frame->bc_count; ++n)
     {
@@ -564,16 +575,16 @@ void apply_boundary_conditions(struct Frame* frame, float* stiffness, float* for
         else if (frame->bconditions[n].kind == BC_Force)
         {
             // Set known boundary forces
-            forces[DOF * node] = frame->bconditions[n].value.x;
-            forces[DOF * node + 1] = frame->bconditions[n].value.y;
-            forces[DOF * node + 2] = frame->bconditions[n].value.z;
+            forces->elements[DOF * node] = frame->bconditions[n].value.x;
+            forces->elements[DOF * node + 1] = frame->bconditions[n].value.y;
+            forces->elements[DOF * node + 2] = frame->bconditions[n].value.z;
         }
         else if (frame->bconditions[n].kind == BC_Moment)
         {
             // Set known boundary moments
-            forces[DOF * node + 3] = frame->bconditions[n].value.x;
-            forces[DOF * node + 4] = frame->bconditions[n].value.y;
-            forces[DOF * node + 5] = frame->bconditions[n].value.z;
+            forces->elements[DOF * node + 3] = frame->bconditions[n].value.x;
+            forces->elements[DOF * node + 4] = frame->bconditions[n].value.y;
+            forces->elements[DOF * node + 5] = frame->bconditions[n].value.z;
         }
         else if (frame->bconditions[n].kind == BC_Joint)
         {
@@ -621,5 +632,16 @@ void apply_boundary_conditions(struct Frame* frame, float* stiffness, float* for
                 }
             }
         }
+    }
+}
+
+void equationset_release(struct EquationSet* eqset)
+{
+    if (eqset)
+    {
+        vecf_release(&eqset->forces);
+        vecf_release(&eqset->displacements);
+        matrix_release(&eqset->stiffness);
+        matrix_release(&eqset->stiff_bc);
     }
 }
