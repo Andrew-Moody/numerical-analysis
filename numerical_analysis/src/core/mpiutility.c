@@ -14,6 +14,7 @@
 // These are known only to this file and are accessed through get_rank and get_proc respectively
 int RANK = -1;
 int PROCS = -1;
+int MAIN_RANK = -1;
 
 int INITIALIZED = 0;
 
@@ -34,6 +35,9 @@ void initialize_mpi(int* argc, char*** argv)
 
     // Local process index
     MPI_Comm_rank(MPI_COMM_WORLD, &RANK);
+
+    // 0 or PROC-1 are safe choices unless you need a specific system to be main
+    MAIN_RANK = 0;
 
 #endif
 }
@@ -71,6 +75,16 @@ int get_procs_mpi(void)
     }
 
     return PROCS;
+}
+
+int get_main_mpi(void)
+{
+    if (MAIN_RANK == -1)
+    {
+        fprintf(stderr, "Attempted to access main rank but MPI is not initialized\n");
+    }
+
+    return MAIN_RANK;
 }
 
 int get_initialized_mpi(void)

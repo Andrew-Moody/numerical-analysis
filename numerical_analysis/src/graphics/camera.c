@@ -12,14 +12,19 @@ void camera_init(struct Camera* camera, int screen_width, int screen_height, flo
     camera->rotation = (struct vec3){ 0.f, 0.f, 0.f };
     camera->transform = MAT4_IDENTITY;
 
+    camera_update(camera);
+}
+
+
+void camera_update(struct Camera* camera)
+{
     // Mapping physical units (say meters) to normalized device coordinates (-1, 1)
 
-    float aspect = screen_width / (float)screen_height;
+    float aspect = camera->screen_width / (float)camera->screen_height;
 
     // for now let physical screen height be 1 meter * zoom fraction
-    float height = zoom;
+    float height = camera->zoom;
     float width = aspect * height;
-
 
     // Scaling
     /* float sx = 2.f / width;
@@ -28,19 +33,16 @@ void camera_init(struct Camera* camera, int screen_width, int screen_height, flo
 
     float sx = 1.f / width;
     float sy = 1.f / height;
-    float sz = -2.f / (far - near);
+    float sz = -2.f / (camera->far_z - camera->near_z);
 
     // Translation
     float px = 0.0f;
     float py = 0.0f;
-    float pz = (far - near) / (far + near);
+    float pz = (camera->far_z - camera->near_z) / (camera->far_z + camera->near_z);
 
     camera->proj_matrix = mat4_transform(px, py, pz, 0.f, 0.f, 0.f, sx, sy, sz);
-}
 
 
-void camera_update(struct Camera* camera)
-{
     camera->transform = mat4_transform(camera->position.x, camera->position.y, camera->position.z,
         camera->rotation.x, camera->rotation.y, camera->rotation.z, 1.f, 1.f, 1.f);
 

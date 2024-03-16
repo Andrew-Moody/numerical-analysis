@@ -4,6 +4,8 @@ struct Mesh;
 struct Model;
 struct GLFWwindow;
 
+void graphics_demo(struct GLFWwindow* window);
+
 void create_sample_grid(struct Mesh* mesh, struct Model* model);
 
 void create_sample_stl(struct Mesh* mesh, struct Model* model, const char* path);

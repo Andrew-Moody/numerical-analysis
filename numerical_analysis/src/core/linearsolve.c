@@ -3,8 +3,9 @@
 #include <stdio.h>
 #include <omp.h>
 
+#include "frame.h"
 
-void solve_jacobi(float* matrix_a, float* vector_x, float* vector_b, int rows, int cols, int iterations, int desired_threads)
+void solve_jacobi_omp(struct EquationSet* eqset, int iterations, int desired_threads)
 {
     // Solves a linear system of the form Ax = b for x using the Jacobi Method
 
@@ -22,6 +23,13 @@ void solve_jacobi(float* matrix_a, float* vector_x, float* vector_b, int rows, i
 
     double startTime = omp_get_wtime();
 
+    float* matrix_a = eqset->stiff_bc.elements;
+    float* vector_x = eqset->displacements.elements;
+    float* vector_b = eqset->forces.elements;
+    int rows = eqset->stiff_bc.rows;
+    int cols = eqset->stiff_bc.cols;
+
+
     if (desired_threads < 1)
     {
         // Most likely not intended
@@ -30,9 +38,42 @@ void solve_jacobi(float* matrix_a, float* vector_x, float* vector_b, int rows, i
     }
     else if (desired_threads == 1)
     {
+        int print = 1;
+
+
+        // Need a place to store values from previous iteration to not clobber them while updating current iteration
+        float* prev_x = malloc(sizeof(*prev_x) * cols);
+
+        // Set initial guess to x_i = b_i / A_ii
+        // Convergence may be faster with better initial guesses and in some cases
+        // failure to converge was seen when initialized to zero
+        for (int i = 0; i < cols; ++i)
+        {
+            float diag = matrix_a[i + i * cols];
+
+            // Keep initial value zero for stiffness elements eliminated by boundary conditions
+            if (diag != 1.0f || diag != 0.0f)
+            {
+                vector_x[i] = vector_b[i] / diag;
+            }
+            else
+            {
+                vector_x[i] = 0.0f;
+            }
+
+        }
+
         // Single threaded only
         for (int t = 0; t < iterations; ++t)
         {
+            // update to use the newly calculated values
+            for (int i = 0; i < cols; ++i)
+            {
+                prev_x[i] = vector_x[i];
+            }
+
+            if (print) printf("%d: Iteration: %d\n", 0, t);
+
             // update one row at a time
             for (int j = 0; j < rows; ++j)
             {
@@ -42,27 +83,60 @@ void solve_jacobi(float* matrix_a, float* vector_x, float* vector_b, int rows, i
                 {
                     if (i != j)
                     {
-                        x += matrix_a[i + j * cols] * vector_x[i];
+                        x += matrix_a[i + j * cols] * prev_x[i];
                     }
                 }
+
+                if (print) printf("%d: ", 0);
+                if (print) printf("Sum: %f, ", x);
 
                 // subtract the sum from b_j and divide by A_jj
                 x = vector_b[j] - x;
 
+                if (print) printf("F-Sum: %f, ", x);
+
                 // if you ensure diagonals are set to 1 if not active this check can be skipped
                 float k_jj = matrix_a[j + j * cols];
+
+                if (print) printf("Diag: %f, ", k_jj);
+
                 if (k_jj != 0.f)
                 {
                     x /= k_jj;
                 }
 
+                if (print) printf("X: %f\n", x);
+
                 // update x_j to the new estimate
                 vector_x[j] = x;
             }
+
+            if (print)
+            {
+                printf("%d: X Prev ", 0);
+                for (int i = 0; i < cols; ++i)
+                {
+                    printf("%4.2f ", prev_x[i]);
+                }
+                printf("\n");
+
+                printf("%d: X Curr ", 0);
+                for (int i = 0; i < cols; ++i)
+                {
+                    printf("%4.2f ", vector_x[i]);
+                }
+                printf("\n");
+            }
         }
+
+        free(prev_x);
     }
     else
     {
+        // This is technically Gauss-Seidel not Jacobi since the x value being currently updated
+        // takes into account x values that have already been updated this iteration
+        // this seems to work since omp threads share memory but doesn't translate well to MPI as is
+
         // Multi-threaded
 #pragma omp parallel num_threads(desired_threads)
         // for (int t = 0; t < 10; ++t) dohh

@@ -12,5 +12,8 @@ int get_rank_mpi(void);
 // Get the current number of processes
 int get_procs_mpi(void);
 
+// Get the rank associated with the "main" process
+int get_main_mpi(void);
+
 // Check if MPI has been initialized
 int get_initialized_mpi(void);

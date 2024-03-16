@@ -207,7 +207,7 @@ static inline void matrix_print(const struct Matrix matrix)
 // Break a 6x6 matrix into its 3x3 quadrants
 static inline void mat6_break_quads(float* mat, struct mat3* quads)
 {
-    printf("Breaking Quads\n\n");
+    //printf("Breaking Quads\n\n");
 
     for (int q = 0; q < 4; ++q)
     {
@@ -229,7 +229,7 @@ static inline void mat6_break_quads(float* mat, struct mat3* quads)
 // Join 3x3 quadrants into a single 6x6 matrix
 static inline void mat6_join_quads(float* mat, struct mat3* quads)
 {
-    printf("Joining Quads\n\n");
+    //printf("Joining Quads\n\n");
 
     for (int q = 0; q < 4; ++q)
     {

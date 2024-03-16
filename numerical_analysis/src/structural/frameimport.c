@@ -41,7 +41,7 @@ int frame_import(const char* filename, struct Frame* frame)
             break;
         }
 
-        printf("%s %i\n", buffer, count);
+        //printf("%s %i\n", buffer, count);
 
         // Check the contents of buffer to see if it matches a valid command
 
@@ -66,7 +66,7 @@ int frame_import(const char* filename, struct Frame* frame)
                     break;
                 }
 
-                printf("%i, %f, %f, %f\n", n, x, y, z);
+                //printf("%i, %f, %f, %f\n", n, x, y, z);
 
                 // Initialize a node with the values that were read
                 frame->nodes[i] = (struct Node){ (struct vec3) { x, y, z } };
@@ -94,7 +94,7 @@ int frame_import(const char* filename, struct Frame* frame)
                     break;
                 }
 
-                printf("%i, %i, %f, %f, %f\n", n1, n2, elastic_modulus, shear_modulus, radius);
+                //printf("%i, %i, %f, %f, %f\n", n1, n2, elastic_modulus, shear_modulus, radius);
 
                 // Initialize an element with the values that were read
                 frame->elements[i] = (struct Element){ n1, n2, elastic_modulus, shear_modulus, radius };
@@ -156,13 +156,13 @@ int frame_import(const char* filename, struct Frame* frame)
 
                 //printf("%i, %f, %f, %f, %s\n", n, x, y, z, buffer);
 
-                printf("%i, %f, %f, %f, %s, %i\n", n,
+                /* printf("%i, %f, %f, %f, %s, %i\n", n,
                     frame->bconditions[i].value.x,
                     frame->bconditions[i].value.y,
                     frame->bconditions[i].value.z,
                     buffer,
                     boundary_kind
-                );
+                ); */
             }
         }
         else
@@ -183,7 +183,7 @@ int frame_import(const char* filename, struct Frame* frame)
         return -1;
     }
 
-    printf("End of File\n\n");
+    //printf("End of File\n\n");
     return 0;
 }
 

@@ -19,6 +19,29 @@
 #include "filepath.h"
 
 
+void graphics_demo(struct GLFWwindow* window)
+{
+    struct Mesh mesh;
+    struct Model model;
+
+    // Specify filepaths relative to [repository]/models/
+    //create_sample_stl(&mesh, &model, "orientation.stl");
+    create_sample_stl(&mesh, &model, "3DBenchy.stl");
+    //create_sample_grid(&mesh, &model);
+    create_model_from_mesh(&mesh, &model);
+
+    // Benchy model needs to be scaled down or camera settings adjusted
+    // also needs to be rotated and shifted down to center on the screen
+    model.transform = mat4_transform(0.0f, -0.5f, 0.0f, -90.0f, 0.0f, 0.0f, 0.025f, 0.025f, 0.025f);
+
+    // Render the model
+    render_model(window, &model);
+
+    mesh_release(&mesh);
+    model_release(&model);
+}
+
+
 void create_sample_grid(struct Mesh* mesh, struct Model* model)
 {
     // Create a grid of quads
@@ -35,7 +58,7 @@ void create_sample_grid(struct Mesh* mesh, struct Model* model)
 void create_sample_stl(struct Mesh* mesh, struct Model* model, const char* filename)
 {
     // Get the full filepath looking for a file (or filepath) relative to repo/models/
-    char* path = get_full_filepath(path, "models/");
+    char* path = get_full_filepath(filename, "models/");
 
     // Load a mesh from STL file
     load_stl(path, mesh);
@@ -47,10 +70,6 @@ void create_sample_stl(struct Mesh* mesh, struct Model* model, const char* filen
     model->transform = mat4_transform(0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 1.f, 1.f, 1.f);
     model->cull_backface = GL_FALSE;
     model->draw_wireframe = GL_TRUE;
-
-    // Benchy model is too big to fit on screen unless perspective projection is used
-    // also needs to be rotated and shifted down to center on the screen
-    //model->transform = mat4_transform(0.0f, -0.5f, 0.0f, -90.0f, 0.0f, 0.0f, 0.025f, 0.025f, 0.025f);
 }
 
 void create_model_from_mesh(struct Mesh* mesh, struct Model* model)

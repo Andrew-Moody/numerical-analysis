@@ -271,66 +271,6 @@ void build_stiffness(struct Frame* frame, struct Matrix* k_global)
     //matrix_print(k_global, dof_count, dof_count);
 }
 
-void frame_solve(struct Frame* frame)
-{
-    struct EquationSet eqset;
-
-    frame_build_equations(frame, &eqset);
-
-    // For convenience
-    struct Matrix* stiffness = &eqset.stiffness;
-    struct Matrix* stiff_bc = &eqset.stiff_bc;
-    struct vecf* forces = &eqset.forces;
-    struct vecf* displacements = &eqset.displacements;
-
-    //printf("Force boundary conditions:\n");
-    //matrix_print(forces, dof_count, 1);
-
-    //printf("Stiffness modified with boundary conditions\n");
-    //matrix_print(k_boundary, dof_count, dof_count);
-
-    // F = KU can now be solved for the displacements U = k^-1 * F
-    // using the known boundary condition forces
-    int dof_count = DOF * frame->node_count;
-    solve_jacobi(eqset.stiff_bc.elements, eqset.displacements.elements,
-        eqset.forces.elements, dof_count, dof_count, 100, 1);
-
-    // Populate per node properties using displacements to back calculate forces
-    frame_update_results(frame, &eqset);
-
-    // Print Node displacments and forces
-
-    for (int n = 0; n < frame->node_count; ++n)
-    {
-        printf("Node %i Displacement: (%2.3f, %2.3f, %2.3f), Rotation: (%2.3f, %2.3f, %2.3f)\n", n,
-            displacements->elements[n * DOF],
-            displacements->elements[n * DOF + 1],
-            displacements->elements[n * DOF + 2],
-            displacements->elements[n * DOF + 3],
-            displacements->elements[n * DOF + 4],
-            displacements->elements[n * DOF + 5]
-        );
-    }
-
-    printf("\n");
-
-    for (int n = 0; n < frame->node_count; ++n)
-    {
-        printf("Node %i Force: (%2.3f, %2.3f, %2.3f), Moment: (%2.3f, %2.3f, %2.3f)\n", n,
-            forces->elements[n * DOF],
-            forces->elements[n * DOF + 1],
-            forces->elements[n * DOF + 2],
-            forces->elements[n * DOF + 3],
-            forces->elements[n * DOF + 4],
-            forces->elements[n * DOF + 5]
-        );
-    }
-
-    // Cleanup
-    equationset_release(&eqset);
-}
-
-
 void frame_update_results(struct Frame* frame, struct EquationSet* eqset)
 {
     int dof_count = DOF * frame->node_count;
@@ -486,14 +426,14 @@ void transform_element_stiffness(struct mat6* k_local, struct mat3 transform)
 
 void add_element_stiffness(struct Matrix* k_global, struct mat6* k_element, struct mat3 transform, int node1, int node2, int node_count)
 {
-    printf("Element stiffness for nodes %i and %i:\nLocal:\n", node1, node2);
-    mat6_print(*k_element);
+    //printf("Element stiffness for nodes %i and %i:\nLocal:\n", node1, node2);
+    //mat6_print(*k_element);
 
     // Use the transformation matrix to transform the element stiffness matrix from local to global frame
     transform_element_stiffness(k_element, transform);
 
-    printf("Global:\n");
-    mat6_print(*k_element);
+    //printf("Global:\n");
+    //mat6_print(*k_element);
 
     // Add the element stiffness contribution to the global stiffness matrix
     int offset = 6 * node2 + 36 * (node1 * node_count);
@@ -644,4 +584,81 @@ void equationset_release(struct EquationSet* eqset)
         matrix_release(&eqset->stiffness);
         matrix_release(&eqset->stiff_bc);
     }
+}
+
+void frame_print_results(struct Frame* frame)
+{
+    // Need to work on formatting
+    printf("          Displacement              Rotation              Force              Moment\n");
+
+    for (int n = 0; n < frame->node_count; ++n)
+    {
+        struct Node* node = &frame->nodes[n];
+
+        printf("Node %i | (%2.3f, %2.3f, %2.3f) | (%2.3f, %2.3f, %2.3f) | "
+            "(% 2.3f, % 2.3f, % 2.3f) | (% 2.3f, % 2.3f, % 2.3f)\n\n", n,
+            node->displacement.x,
+            node->displacement.y,
+            node->displacement.z,
+
+            node->rotation.x,
+            node->rotation.y,
+            node->rotation.z,
+
+            node->force.x,
+            node->force.y,
+            node->force.z,
+
+            node->moment.x,
+            node->moment.y,
+            node->moment.z
+        );
+    }
+
+    // More for printing the equation set
+    /* for (int n = 0; n < frame->node_count; ++n)
+    {
+        printf("Node %i Displacement: (%2.3f, %2.3f, %2.3f), Rotation: (%2.3f, %2.3f, %2.3f)\n", n,
+            displacements->elements[n * DOF],
+            displacements->elements[n * DOF + 1],
+            displacements->elements[n * DOF + 2],
+            displacements->elements[n * DOF + 3],
+            displacements->elements[n * DOF + 4],
+            displacements->elements[n * DOF + 5]
+        );
+    }
+
+    printf("\n");
+
+    for (int n = 0; n < frame->node_count; ++n)
+    {
+        printf("Node %i Force: (%2.3f, %2.3f, %2.3f), Moment: (%2.3f, %2.3f, %2.3f)\n", n,
+            forces->elements[n * DOF],
+            forces->elements[n * DOF + 1],
+            forces->elements[n * DOF + 2],
+            forces->elements[n * DOF + 3],
+            forces->elements[n * DOF + 4],
+            forces->elements[n * DOF + 5]
+        );
+    } */
+}
+
+void frame_solve(struct Frame* frame)
+{
+    struct EquationSet eqset;
+
+    frame_build_equations(frame, &eqset);
+
+    // F = KU can now be solved for the displacements U = k^-1 * F
+    // using the known boundary condition forces
+    solve_jacobi_omp(&eqset, 100, 1);
+
+    // Populate per node properties using displacements to back calculate forces
+    frame_update_results(frame, &eqset);
+
+    // Print Node displacments and forces
+    frame_print_results(frame);
+
+    // Cleanup
+    equationset_release(&eqset);
 }

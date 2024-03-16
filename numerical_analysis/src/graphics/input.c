@@ -18,6 +18,45 @@ void cursor_position_callback(GLFWwindow* window, double xpos, double ypos)
 
 }
 
+void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
+{
+    // There is a bit of an issue i'm having trouble finding information on
+    // and am not sure if it is a problem with GLFW, mouse settings or the mouse itself
+    // When you are scrolliing in one direction and then change to a different direction
+    // one "click" of the scroll wheel does not get registered (no callback is called)
+    // so if scrolling down the first upward click does not register and vice versa
+    // When using the mouse normally say in VSCode or web browser this skip does not happen
+
+    // Luckily it gives a delta rather than absolute position
+    //printf("Scroll: (%f, %f)\n", xoffset, yoffset);
+
+    // Check for scroll up or down
+    /* if (yoffset < -0.5f)
+    {
+        printf("Scroll down\n");
+    }
+    else if (yoffset > 0.5f)
+    {
+        printf("Scroll up\n");
+    }
+    else
+    {
+        printf("No Scroll\n");
+    } */
+
+    // Unpack the application data from the user defined window payload
+    struct Application* application = glfwGetWindowUserPointer(window);
+    if (application)
+    {
+        //printf("Zoom: %f\n", application->camera->zoom);
+
+        float sensitivity = 0.5f;
+        application->camera->zoom -= yoffset * sensitivity;
+    }
+
+
+}
+
 
 // Called when a key event is detected
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod)
@@ -93,6 +132,7 @@ void input_init(struct GLFWwindow* window)
     glfwSetKeyCallback(window, key_callback);
     glfwSetCursorPosCallback(window, cursor_position_callback);
     glfwSetMouseButtonCallback(window, mouse_button_callback);
+    glfwSetScrollCallback(window, scroll_callback);
 }
 
 // Continuous Polling
