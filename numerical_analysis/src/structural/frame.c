@@ -651,7 +651,11 @@ void frame_solve(struct Frame* frame)
 
     // F = KU can now be solved for the displacements U = k^-1 * F
     // using the known boundary condition forces
-    solve_jacobi_omp(&eqset, 100, 1);
+    int iterations = 100;
+    struct vecf residuals;
+    vecf_init(&residuals, iterations);
+    struct EquationChunk chunk = {};
+    solve_jacobi_single(chunk, residuals.elements, iterations);
 
     // Populate per node properties using displacements to back calculate forces
     frame_update_results(frame, &eqset);

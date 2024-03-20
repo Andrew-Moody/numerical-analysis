@@ -244,3 +244,85 @@ static inline void mat6_join_quads(float* mat, struct mat3* quads)
         }
     }
 }
+
+
+static inline void mat_diagnonal_dominance(const struct Matrix mat)
+{
+
+
+    // True until counter example is found
+    int strict_dom = 1;
+    int partial_strict_dom = 1;
+
+    int weak_dom = 1;
+    int partial_weak_dom = 1;
+
+    // False until counter example found
+    int greater_found = 0;
+
+    for (int row = 0; row < mat.rows; ++row)
+    {
+        float diagonal = abs(mat.elements[row + row * mat.cols]);
+
+        // Find the absolute sum of the elements in the row not including the diagonal
+
+        // start by subtracting the absolute diagonal so an (i != j) check is not needed
+        // to eliminate the diagonal from the sum
+        float sum = -diagonal;
+        for (int col = 0; col < mat.cols; ++col)
+        {
+            sum += abs(mat.elements[col + row * mat.cols]);
+        }
+
+        // There are severaly forms of diagonal dominance
+        // Strict: sum < diagonal for all rows
+        // Weak:   sum <= diagonal for all rows
+        // Irreducible: sum <= diag for all rows and sum < diag for at least one row
+
+        // Jacobi requires strict diagonal dominace to gaurantee convergence
+        // while Gauss Seidel requires strict or irreducible diagonal dominance
+        // even when neither are gauranteed Gauss Seidel is more likely to converge
+
+
+
+
+
+        if (sum >= diagonal)
+        {
+            // Found example of sum greater or equal to diagonal so it is not strictly dominant
+            strict_dom = 0;
+
+            // if the diagonal is 1 or 0 it is most likely a part of the stiffness matrix that is "eliminated"
+            // by boundary conditions (stiffness values will generally have a large magnitude normally)
+            // the relaxed dominant only checks if non eliminated values are strictly dominant
+            // if the stiffness matrices tend to be relaxed dominant but not strictly dominant it means
+            // the matrix itself needs to be reduced to only the active terms which is more complex
+            // if they tend to be neither than Jacobi may not be suitable
+            if (diagonal > 1.1f)
+            {
+                partial_strict_dom = 0;
+            }
+        }
+        else
+        {
+            // Found example of sum less than diagonal so it may be irreducibly dominant
+            greater_found = 1;
+        }
+
+        if (sum > diagonal)
+        {
+            // Found example of sum greater than diagonal so it is not weakly dominant
+            weak_dom = 0;
+
+            // Exclude eliminated entries
+            if (diagonal > 1.1f)
+            {
+                partial_weak_dom = 0;
+            }
+        }
+    }
+
+    printf("Checking diagonal dominance: strict: %d, partial: %d\n", strict_dom, partial_strict_dom);
+    printf("weak: %d, weak partial: %d\n", weak_dom, partial_weak_dom);
+    printf("irreducible: %d, irreducible partial: %d\n", (weak_dom && greater_found), (partial_weak_dom && greater_found));
+}

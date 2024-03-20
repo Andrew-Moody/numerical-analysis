@@ -5,6 +5,7 @@
 
 #include "mpiutility.h"
 #include "frame.h"
+#include "linearsolve.h"
 
 #ifndef ENABLE_MPI
 #define ENABLE_MPI 0
@@ -135,7 +136,6 @@ int solve_equations_mpi(struct EquationSet* eqset, int iterations)
         {
             float diag = stiff_mat[i + i * vec_size];
 
-            // Keep initial value zero for stiffness elements eliminated by boundary conditions
             if (diag != 1.0f || diag != 0.0f)
             {
                 prev_x[i] = force_vec[i] / diag;
@@ -151,12 +151,14 @@ int solve_equations_mpi(struct EquationSet* eqset, int iterations)
     // Broadcast the initial guess
     MPI_Bcast(prev_x, vec_size, MPI_FLOAT, get_main_mpi(), MPI_COMM_WORLD);
 
+    struct EquationChunk chunk = { stiff_chunk, force_chunk, prev_x, curr_x, chunk_size, vec_size };
+
     for (int t = 0; t < iterations; ++t)
     {
         if (print) printf("%d: Iteration: %d\n", rank, t);
 
-        // Solve partial equation perhaps using OpenMP to parallelize further
-        update_jacobi(stiff_chunk, prev_x, curr_x, force_chunk, chunk_size, vec_size);
+        // Perform one update iteration for a chunk of the equation
+        update_chunk_jacobi(chunk);
 
         if (print)
         {
@@ -294,76 +296,6 @@ int recv_equations(struct EquationSet* eqset, int src)
     printf("Rank %d: Recieved displacement vector\n", rank);
 
     return 0;
-
-#endif
-}
-
-
-void update_jacobi(float* matrix_a, float* prev_x, float* curr_x, float* vector_b, int rows, int cols)
-{
-#if ENABLE_MPI == 0
-    fprintf(stderr, "Warning: Attempting to use MPI functionality with MPI disabled\n");
-#else
-    // Inputs are generalized. for structures the matrix is stiffness, x is displacement, and b is force
-
-    //int procs = get_procs_mpi();
-    int rank = get_rank_mpi();
-
-    int print = rank == 1;
-
-    // Revisit when dealing with uneven chunk sizes
-    /*// ensures we essentially "round up" after a division of rows / procs
-    // so 7 / 8 => 1, 7 / 6 => 2
-    // this ensures that chunksize is the smallest number where each process
-    // gets at most chunksize rows to work on
-    int chunksize = (rows + procs - 1) / procs;
-    // The first row in the chunk
-    int rowstart = chunksize * rank;
-    // One past the last row in the chunk clamped to be no more than rows
-    int rowend = rowstart + chunksize;
-    rowend = rowend > rows ? rowend : rows; */
-
-
-    // Instead of recieving the whole matrix each process should only recieve the chunk it will work on
-    // rows is equivalent to chunksize or force/curr_x length and cols is equivalent to prev_x length
-
-    // update all of the rows inside the current chunk
-    for (int j = 0; j < rows; ++j)
-    {
-        // sum up A_ij * x_i as long as i != j
-        float x = 0;
-        for (int i = 0; i < cols; ++i)
-        {
-            if (i != (j + rank * rows))
-            {
-                x += matrix_a[i + j * cols] * prev_x[i];
-            }
-        }
-
-        if (print) printf("%d: ", rank);
-        if (print) printf("Sum: %f, ", x);
-
-        // subtract the sum from b_j
-        x = vector_b[j] - x;
-
-        if (print) printf("F-Sum: %f, ", x);
-
-        // divide by the corresponding diagonal A_jj that was skipped in summation
-        float a_jj = matrix_a[j + j * cols + rank * rows];
-
-        if (print) printf("Diag: %f, ", a_jj);
-
-        // if you ensure diagonals are set to 1 if not active this check can be skipped
-        if (a_jj != 0.f)
-        {
-            x /= a_jj;
-        }
-
-        if (print) printf("X: %f\n", x);
-
-        // update x_j to the new estimate
-        curr_x[j] = x;
-    }
 
 #endif
 }

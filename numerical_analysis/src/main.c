@@ -51,7 +51,7 @@ int main(int argc, char* argv[])
 
 
     // Specify filepaths relative to [repository]/models/
-    const char* filename = "beam.frame";
+    const char* filename = "car.frame";
 
     // Load nodes, elements and boundary conditions from file
     struct Frame frame;
@@ -65,12 +65,43 @@ int main(int argc, char* argv[])
     struct EquationSet eqset;
     frame_build_equations(&frame, &eqset);
 
+    printf("\n");
+
+    //matrix_print(eqset.stiff_bc);
+
+    printf("\n");
+
+    // It seems for most boundary condition sets the stiffness matrix will not be
+    // diagonally dominant even when not counting eliminated elements
+    mat_diagnonal_dominance(eqset.stiff_bc);
+
+    printf("\n");
 
     // Solve Equations
     if (!ENABLE_MPI || procs == 1)
     {
-        // There is only one process so just solve directly with OpenMP
-        solve_jacobi_omp(&eqset, iterations, 1);
+        // There is only one process so just solve directly
+        struct vecf residuals;
+        vecf_init(&residuals, iterations);
+
+        struct vecf prev_x;
+        vecf_init(&prev_x, eqset.displacements.count);
+
+        struct EquationChunk chunk = {
+            eqset.stiff_bc.elements,
+            eqset.forces.elements,
+            eqset.displacements.elements,
+            prev_x.elements,
+            eqset.stiff_bc.rows,
+            eqset.stiff_bc.cols
+        };
+
+        solve_jacobi_single(chunk, residuals.elements, iterations);
+
+        for (int i = 0; i < iterations; ++i)
+        {
+            printf("%d: %f\n", i, residuals.elements[i]);
+        }
     }
     else
     {
@@ -86,7 +117,7 @@ int main(int argc, char* argv[])
     // The equation set is no longer needed
     equationset_release(&eqset);
 
-    frame_print_results(&frame);
+    //frame_print_results(&frame);
 
     // Old method with OpenMP where everything is encapsulated
     //frame_solve(&frame);
