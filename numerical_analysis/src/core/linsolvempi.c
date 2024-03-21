@@ -121,30 +121,14 @@ int solve_equations_mpi(struct EquationSet* eqset, int iterations)
     float* curr_x = malloc(sizeof(*curr_x) * chunk_size);
 
 
-    // Not uncommon to give an intial guess for the displacements (will revisit)
+    // Not uncommon to give an intial guess for the displacements
     if (rank == root)
     {
-        for (int i = 0; i < vec_size; ++i)
-        {
-            prev_x[i] = 0; // There are several strategies for picking initial values
-        }
-
         // Set initial guess to x_i = b_i / A_ii
-        // Convergence may be faster with better initial guesses and in some cases
-        // failure to converge was seen when initialized to zero
+        // Convergence may be faster with better initial guesses
         for (int i = 0; i < vec_size; ++i)
         {
-            float diag = stiff_mat[i + i * vec_size];
-
-            if (diag != 1.0f || diag != 0.0f)
-            {
-                prev_x[i] = force_vec[i] / diag;
-            }
-            else
-            {
-                prev_x[i] = 0.0f;
-            }
-
+            prev_x[i] = force_vec[i] / stiff_mat[i + i * vec_size];
         }
     }
 

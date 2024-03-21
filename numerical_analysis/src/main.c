@@ -20,7 +20,7 @@ int main(int argc, char* argv[])
     int rank = get_rank_mpi();
     int procs = get_procs_mpi();
     int main_proc = get_main_mpi();
-    int iterations = 10;
+    int iterations = 100;
 
     // If MPI is enabled and multiple processes are being used
     // all but the main process participate only in solving
@@ -28,23 +28,6 @@ int main(int argc, char* argv[])
     {
         struct EquationSet eqset = {};
         solve_equations_mpi(&eqset, iterations);
-
-        /* int vec_size;
-        MPI_Bcast(&vec_size, 1, MPI_INT, main_proc, MPI_COMM_WORLD);
-        printf("%d recieved vector size: %d\n", rank, vec_size);
-        // Recieve equation set, solve, send back results, then return
-        // to single process for rendering
-
-        struct EquationSet eqset = {};
-        recv_equations(&eqset, main_proc);
-
-        // This is still using OpenMP to solve on a single process
-        // Solve F = KU for displacements U = k^-1 * F
-        // using the known boundary condition forces
-        solve_jacobi_omp(&eqset, 100, 1);
-
-        send_equations(&eqset, main_proc); */
-
         finalize_mpi(0);
         return 0;
     }
@@ -65,38 +48,23 @@ int main(int argc, char* argv[])
     struct EquationSet eqset;
     frame_build_equations(&frame, &eqset);
 
-    printf("\n");
-
-    //matrix_print(eqset.stiff_bc);
-
-    printf("\n");
+    // Create space to hold the residuals
+    struct vecf residuals;
+    vecf_init(&residuals, iterations);
 
     // It seems for most boundary condition sets the stiffness matrix will not be
-    // diagonally dominant even when not counting eliminated elements
+    // diagonally dominant so convergence is not guaranteed
     mat_diagnonal_dominance(eqset.stiff_bc);
-
-    printf("\n");
 
     // Solve Equations
     if (!ENABLE_MPI || procs == 1)
     {
         // There is only one process so just solve directly
-        struct vecf residuals;
-        vecf_init(&residuals, iterations);
+        //solve_jacobi_single(eqset, residuals.elements, iterations);
 
-        struct vecf prev_x;
-        vecf_init(&prev_x, eqset.displacements.count);
+        //solve_jacobi_parallel(eqset, residuals.elements, iterations, 8);
 
-        struct EquationChunk chunk = {
-            eqset.stiff_bc.elements,
-            eqset.forces.elements,
-            eqset.displacements.elements,
-            prev_x.elements,
-            eqset.stiff_bc.rows,
-            eqset.stiff_bc.cols
-        };
-
-        solve_jacobi_single(chunk, residuals.elements, iterations);
+        solve_sor_single(eqset, residuals.elements, iterations, 1.1f);
 
         for (int i = 0; i < iterations; ++i)
         {
@@ -109,12 +77,13 @@ int main(int argc, char* argv[])
         solve_equations_mpi(&eqset, iterations);
     }
 
-    // Continue as normal to process and render results
+    // Continue as normal to process and render results on the main process
 
     // Populate per node properties using displacements to back calculate forces
     frame_update_results(&frame, &eqset);
 
     // The equation set is no longer needed
+    vecf_release(&residuals);
     equationset_release(&eqset);
 
     //frame_print_results(&frame);

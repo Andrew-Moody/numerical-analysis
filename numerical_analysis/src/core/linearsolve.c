@@ -14,13 +14,8 @@
 #endif
 
 
-float residual(float* x_vector, int x_length)
-{
-
-}
-
 // Solve the equation set using the Jacobi iterative method
-void solve_jacobi_single(struct EquationChunk chunk, float* residuals, int iterations)
+void solve_jacobi_single(struct EquationSet eqset, float* residuals, int iterations)
 {
     // Solves a linear system of the form Ax = b for x using the Jacobi Iterative Method
 
@@ -33,8 +28,6 @@ void solve_jacobi_single(struct EquationChunk chunk, float* residuals, int itera
 
     // Unfortunately the requirements for guaranteed convergence are more strict than for Gauss-Seidel
     // or SOR and converges slower in general
-
-
 
     // The new estimate for x_i (the ith value in the x vector) at iteration k+1 is given by:
 
@@ -52,77 +45,86 @@ void solve_jacobi_single(struct EquationChunk chunk, float* residuals, int itera
     // To skip needing to check if j != i in a tight loop we just multiple the entire row times x
     // and later subtract the term we want to skip. The residual needs the full value anyway
 
+    const float* matrix_a = eqset.stiff_bc.elements;
+    const float* vector_b = eqset.forces.elements;
+    float* vec_x_curr = eqset.displacements.elements;
+    const int rows = eqset.stiff_bc.rows;
+    const int cols = eqset.stiff_bc.cols;
+
+    // Need space to store the values from the previous iteration
+    float* vec_x_prev = malloc(sizeof(*vec_x_prev) * cols);
+
+    // Set initial guess to x_i = b_i / A_ii
+    // Convergence may be faster with better initial guesses
+    for (int i = 0; i < cols; ++i)
+    {
+        vec_x_prev[i] = vector_b[i] / matrix_a[i + i * cols];
+    }
 
 
     for (int t = 0; t < iterations; ++t)
     {
         float sum_sqr_residual = 0;
 
-        for (int j = 0; j < chunk.rows; ++j)
+        for (int j = 0; j < rows; ++j)
         {
             // Multiply the jth row of A times the previous x vector
-            // 
-
-            // sum up A_ij * x_i as long as i != j
-            /* float x = 0;
-            for (int i = 0; i < chunk.cols; ++i)
+            // Skip the i != j check and subtract A_ii * x_i afterwards
+            // since we will need the full sum anyway for the residual
+            float sum_ax = 0;
+            for (int i = 0; i < cols; ++i)
             {
-                if (i != (j + chunk.id * chunk.rows))
-                {
-                    x += chunk.matrix_a[i + j * chunk.cols] * chunk.prev_x[i];
-                }
-            } */
-
-            // Since we will need the full sum anyway for the residual,
-            // skip the if i != j check and subtract A_ii * x_i afterwards
-            float ax = 0;
-            for (int i = 0; i < chunk.cols; ++i)
-            {
-                ax += chunk.matrix_a[i + j * chunk.cols] * chunk.prev_x[i];
+                sum_ax += matrix_a[i + j * cols] * vec_x_prev[i];
             }
 
+            DLOG("Sum: %f, ", sum_ax);
 
-            DLOG("%d: ", chunk.id);
-            DLOG("Sum: %f, ", ax);
+            // Subtract the sum from b_j to get the jth residual
+            float residual = vector_b[j] - sum_ax;
 
-            // Subtract the sum from b_j to get the residual
-            float residual = chunk.vector_b[j] - ax;
+            DLOG("Residual: %f, ", residual);
 
             // Add the square residual to the running sum of square residuals
             sum_sqr_residual += residual * residual;
 
-            DLOG("Residual: %f, ", residual);
-
-            // get the diagonal term for the row
-            float a_jj = chunk.matrix_a[j + j * chunk.cols + chunk.id * chunk.rows];
+            // Get the diagonal term for the current row
+            // Normally would need to check if it could be zero before dividing but
+            // that should have been ensured when applying boundary conditions
+            float a_jj = matrix_a[j + j * cols];
 
             DLOG("Diag: %f, ", a_jj);
 
-            // a_jj needs to be non-zero but this should have been ensured
-            // when applying boundary conditions so check should not be needed
-            /* if (a_jj == 0.f)
-            {
-                a_jj = 1.0f;
-            } */
-
             // Add x_j * a_jj and divide the result by a_jj to solve for the new estimate of x_j
-            float x = (residual + a_jj * chunk.prev_x[j]) / a_jj;
+            // r_j = b_j - sum( A_ij * x_i ) for all i  ==>  x_j = ( b_j - sum (A_ij * x_i)) / A_jj  for all i != j
+            float x_j = (residual + a_jj * vec_x_prev[j]) / a_jj;
 
-            DLOG("X: %f\n", x);
+            DLOG("X: %f\n", x_j);
 
             // update x_j to the new estimate
-            chunk.curr_x[j] = x;
+            vec_x_curr[j] = x_j;
         }
 
-        float norm_residial = sqrt(sum_sqr_residual);
+        // Update previous x to current x for the next iteration if there are still iterations to do
+        if (t < iterations - 1)
+        {
+            for (int i = 0; i < cols; ++i)
+            {
+                vec_x_prev[i] = vec_x_curr[i];
+            }
+        }
 
-        residuals[t] = norm_residial;
+        // store the norm of residuals for this iteration
+        residuals[t] = sqrt(sum_sqr_residual);
     }
+
+    free(vec_x_prev);
 }
 
 
-void solve_jacobi_parallel(struct EquationChunk chunk, float* residuals, int iterations, int desired_threads)
+void solve_jacobi_parallel(struct EquationSet eqset, float* residuals, int iterations, int desired_threads)
 {
+    // See solve_jacobi_single for more details on the math involved
+
     if (desired_threads < 1)
     {
         // Most likely not intended
@@ -132,50 +134,154 @@ void solve_jacobi_parallel(struct EquationChunk chunk, float* residuals, int ite
     else if (desired_threads == 1)
     {
         // Use the single threaded solution instead
-        solve_jacobi_single(chunk, residuals, iterations);
+        solve_jacobi_single(eqset, residuals, iterations);
         return;
     }
 
-    float* matrix_a = chunk.matrix_a;
-    float* vector_x_prev = chunk.prev_x;
-    float* vector_x_curr = chunk.prev_x;
-    float* vector_b = chunk.vector_b;
-    int rows = chunk.rows;
-    int cols = chunk.cols;
+    const float* matrix_a = eqset.stiff_bc.elements;
+    const float* vector_b = eqset.forces.elements;
+    float* vec_x_curr = eqset.displacements.elements;
+    const int rows = eqset.stiff_bc.rows;
+    const int cols = eqset.stiff_bc.cols;
+
+    // Need space to store the values from the previous iteration
+    float* vec_x_prev = malloc(sizeof(*vec_x_prev) * cols);
 
     // Multi-threaded
 #pragma omp parallel num_threads(desired_threads)
     // for (int t = 0; t < 10; ++t) dohh
     for (int t = 0; t < iterations; ++t)
     {
+        float sum_sqr_residual = 0;
+
         // update multiple rows at a time
-#pragma omp for schedule(dynamic) nowait
+#pragma omp for schedule(dynamic)
         for (int j = 0; j < rows; ++j)
         {
-            // sum up A_ij * x_i as long as i != j
-            float x = 0;
+            // sum up A_ij * x_i
+            float sum_ax = 0;
             for (int i = 0; i < cols; ++i)
             {
-                if (i != j)
-                {
-                    x += matrix_a[i + j * cols] * vector_x_prev[i];
-                }
+                sum_ax += matrix_a[i + j * cols] * vec_x_prev[i];
             }
 
-            // subtract the sum from b_j and divide by A_jj
-            x = vector_b[j] - x;
+            // subtract the sum from b_j to get the residual
+            float residual = vector_b[j] - sum_ax;
 
-            // if you ensure diagonals are set to 1 if not active this check can be skipped
+            // Add the square residual to the running sum of square residuals
+            sum_sqr_residual += residual * residual;
+
+            // The diagonal element for row j
             float k_jj = matrix_a[j + j * cols];
-            if (k_jj != 0.f)
-            {
-                x /= k_jj;
-            }
+
+            // Solve for the new estimate of x_j
+            float x_j = (residual + k_jj * vec_x_prev[j]) / k_jj;
 
             // update x_j to the new estimate
-            vector_x_curr[j] = x;
+            vec_x_curr[j] = x_j;
         }
+
+        // Update previous x to current x for the next iteration if there are still iterations to do
+        if (t < iterations - 1)
+        {
+            for (int i = 0; i < cols; ++i)
+            {
+                vec_x_prev[i] = vec_x_curr[i];
+            }
+        }
+
+        // store the norm of residuals for this iteration
+        residuals[t] = sqrt(sum_sqr_residual);
     }
+
+    free(vec_x_prev);
+}
+
+
+void solve_sor_single(struct EquationSet eqset, float* residuals, int iterations, int relax_factor)
+{
+    // Solves a linear system of the form Ax = b for x using Successive Over-relaxation
+    // it is similar to Jacobi method except it uses a weighted blend between the previous x values
+    // and the current x values mid iteration
+
+    // if the relaxation factor is equal to 1 then only the current values are used making the method
+    // equivalent to the Gauss-Seidel method
+
+    // The relaxtion factor can be fine tuned to improve convergence rate. Both SOR and Gauss-Seidel
+    // are easier to gaurantee convergence then Jacobi.
+
+    // The relaxtion factor should typicaly be in the range 0 < rf < 2
+    // less or equal to zero means the solution never converges because you aren't updating at all
+    // greater or equal to 2 violates convergence gaurantees for symmetric positive definite matrices
+
+    const float* matrix_a = eqset.stiff_bc.elements;
+    const float* vector_b = eqset.forces.elements;
+    float* vec_x_curr = eqset.displacements.elements;
+    const int rows = eqset.stiff_bc.rows;
+    const int cols = eqset.stiff_bc.cols;
+
+    // Need space to store the values from the previous iteration
+    float* vec_x_prev = malloc(sizeof(*vec_x_prev) * cols);
+
+    // Set initial guess to x_i = b_i / A_ii
+    // Convergence may be faster with better initial guesses
+    for (int i = 0; i < cols; ++i)
+    {
+        vec_x_prev[i] = vector_b[i] / matrix_a[i + i * cols];
+    }
+
+
+    for (int t = 0; t < iterations; ++t)
+    {
+        float sum_sqr_residual = 0;
+
+        for (int j = 0; j < rows; ++j)
+        {
+            // Multiply the jth row of A times the current x vector
+            // Skip the i != j check and subtract A_ii * x_i afterwards
+            // since we will need the full sum anyway for the residual
+            // not all values will have been updated yet but values x_0 to x_j-1
+            // will have. This leads to faster convergence since you are using
+            // the new information as soon as you have it
+            float sum_ax = 0;
+            for (int i = 0; i < cols; ++i)
+            {
+                sum_ax += matrix_a[i + j * cols] * vec_x_curr[i];
+            }
+
+            // Subtract the sum from b_j to get the jth residual
+            float residual = vector_b[j] - sum_ax;
+
+            // Add the square residual to the running sum of square residuals
+            sum_sqr_residual += residual * residual;
+
+            // Get the diagonal term for the current row
+            // Normally would need to check if it could be zero before dividing but
+            // that should have been ensured when applying boundary conditions
+            float a_jj = matrix_a[j + j * cols];
+
+            // Add x_j * a_jj and divide the result by a_jj to solve for the new estimate of x_j
+            // r_j = b_j - sum( A_ij * x_i ) for all i  ==>  x_j = ( b_j - sum (A_ij * x_i)) / A_jj  for all i != j
+            float x_j = (residual + a_jj * vec_x_prev[j]) / a_jj;
+
+            // update current x blending between the new (Gauss-Seidel) estimate and previous estimate
+            vec_x_curr[j] = relax_factor * x_j + (1 - relax_factor) * vec_x_prev[j];
+        }
+
+        // Update previous x to current x for the next iteration if there are still iterations to do
+        if (t < iterations - 1)
+        {
+            for (int i = 0; i < cols; ++i)
+            {
+                vec_x_prev[i] = vec_x_curr[i];
+            }
+        }
+
+        // store the norm of residuals for this iteration
+        residuals[t] = sqrt(sum_sqr_residual);
+    }
+
+    free(vec_x_prev);
 }
 
 

@@ -112,10 +112,14 @@ elements 59
 
 
 
-boundary_conditions 6
+boundary_conditions 10
 2 0.0 -30000000.0 0.0 force
 15 0.0 30000000.0 0.0 force
 0 0.0 0.0 0.0 displacement
 11 0.0 0.0 0.0 displacement
 13 0.0 0.0 0.0 displacement
 24 0.0 0.0 0.0 displacement
+0 0.0 0.0 0.0 rotation
+11 0.0 0.0 0.0 rotation
+13 0.0 0.0 0.0 rotation
+24 0.0 0.0 0.0 rotation

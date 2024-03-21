@@ -654,8 +654,7 @@ void frame_solve(struct Frame* frame)
     int iterations = 100;
     struct vecf residuals;
     vecf_init(&residuals, iterations);
-    struct EquationChunk chunk = {};
-    solve_jacobi_single(chunk, residuals.elements, iterations);
+    solve_jacobi_single(eqset, residuals.elements, iterations);
 
     // Populate per node properties using displacements to back calculate forces
     frame_update_results(frame, &eqset);
@@ -664,5 +663,6 @@ void frame_solve(struct Frame* frame)
     frame_print_results(frame);
 
     // Cleanup
+    vecf_release(&residuals);
     equationset_release(&eqset);
 }
