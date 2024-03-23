@@ -4,6 +4,7 @@
 #include "matrix.h"
 
 struct Mesh;
+struct Vertex;
 
 struct Node
 {
@@ -15,6 +16,9 @@ struct Node
     struct vec3 moment;
     struct vec3 displacement;
     struct vec3 rotation;
+
+    // "Color" assigned to node groups that can be solved independently on multiple processes
+    int multicolor;
 };
 
 struct Element
@@ -68,6 +72,9 @@ struct EquationSet
     struct vecf displacements;
 };
 
+// Function pointer for functions that map node data to vertex color
+typedef void (*color_func_t)(struct Vertex*, struct Node*);
+
 // Build a set of matrices and vectors representing the problem
 void frame_build_equations(struct Frame* frame, struct EquationSet* eqset);
 
@@ -80,9 +87,22 @@ void frame_release(struct Frame* frame);
 // Create a graphical mesh representation of the frame
 void frame_create_mesh(struct Frame* frame, struct Mesh* mesh);
 
+// Recolor the mesh vertices using a color function that maps node data to vertex color
+void frame_mesh_recolor(const struct Frame* frame, struct Mesh* mesh, color_func_t color_func);
+
 void equationset_release(struct EquationSet* eqset);
 
 void frame_print_results(struct Frame* frame);
 
 // Solve the linear equation representing the frame using an iterative method with OpenMP
 void frame_solve(struct Frame* frame);
+
+// Color a vertex based on x displacement (-1 to 1) -> (blue to red)
+void color_disp_x(struct Vertex* vertex, struct Node* node);
+
+// Color a vertex based on y displacement (-1 to 1) -> (blue to red)
+void color_disp_y(struct Vertex* vertex, struct Node* node);
+
+// Color a vertex based on its color code for breaking a mesh into independent parts
+// for multicolor SOR methods
+void color_parallel_multicolor(struct Vertex* vertex, struct Node* node);

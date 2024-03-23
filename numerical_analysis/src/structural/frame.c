@@ -330,51 +330,16 @@ void frame_create_mesh(struct Frame* frame, struct Mesh* mesh)
     mesh->indices_length = 3 * frame->element_count;
     mesh->indices = malloc(sizeof(*mesh->indices) * mesh->indices_length);
 
-
     // Make a vertex for each node 
-    // scaling between blue and red for x displacement
     for (int i = 0; i < frame->node_count; ++i)
     {
-        float x = frame->nodes[i].displacement.x;
-        float y = frame->nodes[i].displacement.y;
-        float z = frame->nodes[i].displacement.z;
-
-        float r;
-        float g;
-        float b;
-
-        /* if (x > 0.f)
-        {
-            r = x;
-            g = 1.f - x;
-            b = 0.f;
-        }
-        else
-        {
-            r = 0.f;
-            g = 1.f + x;
-            b = -x;
-        } */
-
-        if (y > 0.f)
-        {
-            r = y;
-            g = 1.f - y;
-            b = 0.f;
-        }
-        else
-        {
-            r = 0.f;
-            g = 1.f + y;
-            b = -y;
-        }
-
-
+        // Default color to grey
         mesh->vertices[i] = (struct Vertex){
             frame->nodes[i].pos.x,
             frame->nodes[i].pos.y,
             frame->nodes[i].pos.z,
-            r, g, b
+            0.6f, 0.6f, 0.6f
+            //0.3f, 0.3f, 0.3f
         };
     }
 
@@ -384,6 +349,21 @@ void frame_create_mesh(struct Frame* frame, struct Mesh* mesh)
         mesh->indices[3 * i] = frame->elements[i].node1;
         mesh->indices[3 * i + 1] = frame->elements[i].node2;
         mesh->indices[3 * i + 2] = frame->elements[i].node2;
+    }
+}
+
+
+void frame_mesh_recolor(const struct Frame* frame, struct Mesh* mesh, color_func_t color_func)
+{
+    if (frame->node_count != mesh->vertices_length)
+    {
+        fprintf(stderr, "Error Recoloring mesh: frame node count does not match mesh vertex count");
+        return;
+    }
+
+    for (int i = 0; i < mesh->vertices_length; ++i)
+    {
+        color_func(&mesh->vertices[i], &frame->nodes[i]);
     }
 }
 
@@ -665,4 +645,79 @@ void frame_solve(struct Frame* frame)
     // Cleanup
     vecf_release(&residuals);
     equationset_release(&eqset);
+}
+
+void color_disp_x(struct Vertex* vertex, struct Node* node)
+{
+    float x = node->displacement.x;
+
+    vertex->r = fmaxf(x, 0.f);
+    vertex->g = 1.f - fabsf(x);
+    vertex->b = fmaxf(-x, 0.f);
+}
+
+void color_disp_y(struct Vertex* vertex, struct Node* node)
+{
+    float y = node->displacement.y;
+
+    vertex->r = fmaxf(y, 0.f);
+    vertex->g = 1.f - fabsf(y);
+    vertex->b = fmaxf(-y, 0.f);
+}
+
+void color_parallel_multicolor(struct Vertex* vertex, struct Node* node)
+{
+    switch (node->multicolor)
+    {
+    case 0:
+        vertex->r = 0.0f;
+        vertex->g = 0.0f;
+        vertex->b = 0.0f;
+        break;
+    case 1:
+        vertex->r = 1.0f;
+        vertex->g = 1.0f;
+        vertex->b = 0.0f;
+        break;
+    case 2:
+        vertex->r = 1.0f;
+        vertex->g = 0.0f;
+        vertex->b = 1.0f;
+        break;
+    case 3:
+        vertex->r = 0.0f;
+        vertex->g = 1.0f;
+        vertex->b = 1.0f;
+        break;
+    case 4:
+        vertex->r = 1.0f;
+        vertex->g = 1.1f;
+        vertex->b = 0.5f;
+        break;
+    case 5:
+        vertex->r = 1.0f;
+        vertex->g = 0.1f;
+        vertex->b = 0.5f;
+        break;
+    case 6:
+        vertex->r = 0.0f;
+        vertex->g = 0.0f;
+        vertex->b = 1.0f;
+        break;
+    case 7:
+        vertex->r = 0.0f;
+        vertex->g = 1.0f;
+        vertex->b = 0.0f;
+        break;
+    case 8:
+        vertex->r = 1.0f;
+        vertex->g = 1.0f;
+        vertex->b = 1.0f;
+        break;
+    default:
+        vertex->r = 0.0f;
+        vertex->g = 0.0f;
+        vertex->b = 0.0f;
+        break;
+    }
 }

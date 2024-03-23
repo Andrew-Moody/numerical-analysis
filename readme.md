@@ -1,11 +1,24 @@
 # Structural Frame Finite Element Analysis
 
+Finite Element Analysis solver for 3D structural frames with OpenGL visualization. Imports a frame definition from a text file and builds a set of linear equations that relate the forces on the structure to the deflections of the structure via a stiffness matrix made by combining the individual stiffness matrices of each element. Each element can have its own physical properties (Radius, Elastic Modulus, Shear Modulus) defined in the file. Boundary Conditions are applied to make the stiffness matrix non-singular and therefore invertible. The linear equation set is solved using iterative methods, either Jacobi or Successive Over-relaxation. After solving for displacements and unknown forces the 3D model is colorized to visualize deflection.
+
 ![Car Frame](carframe.png)
 
 FSAE car frame with deflection
 
+Jacobi iteration is considered "embarrassingly parallel" in that data does not need to be shared or passed between threads or process in order for multiple portions of the problem to be solved concurrently and can be implemented easily in OpenMP or MPI.
+
+Successive Over-relaxation (and Gauss-Seidel) increases convergence rate by using intermediate results during a particular iteration. This means data needs to be shared between threads and/or processes. One way to overcome this limitation is to use a “multicolor” SOR method where the linear equations are first segregated into sets where the unknowns in one set are independent of the unknowns in another. One way to do this is to assign every node a “color” such that no two nodes that are part of an element share the same color. By doing this the equations can then be reordered by color to allow each color to be solved on its own thread/process.
+
+![Multicolor Grouping](multicolorgrouping.png)
+
+Nodes grouped into independent "color" sets
+
+At the moment I have Jacobi and Successive Over-relaxation both implemented with single threading as well as Jacobi implemented with multiple threads/processes using OpenMP. I am currently working on adding MPI support and implementing a multicolor SOR method to allow parallel SOR and have a working color assignment so far.
+Unfortunately, Jacobi does not converge for the FSAE car frame example. I am still investigating if this is a consequence of the frame geometry itself or poor boundary conditions. The post boundary condition stiffness matrix is neither strong, weak, nor irreducibly diagonally dominant so neither Jacobi nor SOR are guaranteed to converge. I have not checked the spectral radius but given Jacobi does not converge we can conclude it is >= 1.
+
 ### Dependencies and Build instructions
-This project has currently only been tested on Ubuntu but I will be trying to test on other distributions and potentially adding a windows version as well.
+This project has currently only been tested on WSL Ubuntu but I will be trying to test on other distributions and potentially adding a windows version as well.
 
 #### TLDR
     sudo apt update  
@@ -18,7 +31,13 @@ This project has currently only been tested on Ubuntu but I will be trying to te
     cd [repo location]/build/numerical_analysis
     ./numerical_analysis
 
-Makes you almost miss good old windows installation wizards.
+By default MPI is disabled and is still experimental. If your system supports MPI and you want to enable it you will need to pass a flag to the cmake command
+
+    cmake ../ -DENABLE_MPI=true
+
+Then to run with multiple processes you have to run with an MPI command
+
+    mpirun -n [number of processes]
 
 #### More Details
 Ubuntu comes with gcc which should support OpenMP out of the box. You just need to have the -fopenmp compiler flag set which should be handled correctly with the provided CMake files.

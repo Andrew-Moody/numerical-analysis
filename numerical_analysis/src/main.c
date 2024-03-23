@@ -7,6 +7,7 @@
 #include "mesh.h"
 #include "model.h"
 #include "frameimport.h"
+#include "frameprocess.h"
 
 #include "mpiutility.h"
 #include "mpitest.h"
@@ -23,11 +24,10 @@ int main(int argc, char* argv[])
     int iterations = 100;
 
     // If MPI is enabled and multiple processes are being used
-    // all but the main process participate only in solving
+    // only the main process does anything more than participate in solving
     if (ENABLE_MPI && procs != 1 && rank != main_proc)
     {
-        struct EquationSet eqset = {};
-        solve_equations_mpi(&eqset, iterations);
+        solve_equations_mpi(NULL, iterations);
         finalize_mpi(0);
         return 0;
     }
@@ -43,6 +43,8 @@ int main(int argc, char* argv[])
         finalize_mpi(0);
         return 1;
     }
+
+    frame_preprocess(&frame);
 
     // Produce the set of matrices and vectors representing the problem
     struct EquationSet eqset;
@@ -66,14 +68,15 @@ int main(int argc, char* argv[])
 
         solve_sor_single(eqset, residuals.elements, iterations, 1.1f);
 
-        for (int i = 0; i < iterations; ++i)
+        /* for (int i = 0; i < iterations; ++i)
         {
             printf("%d: %f\n", i, residuals.elements[i]);
-        }
+        } */
     }
     else
     {
         // Solve using MPI (See linsolvempi.h/c)
+        // Still in development
         solve_equations_mpi(&eqset, iterations);
     }
 
@@ -99,6 +102,11 @@ int main(int argc, char* argv[])
     struct Mesh mesh;
     struct Model model;
     frame_create_mesh(&frame, &mesh);
+
+    //frame_mesh_recolor(&frame, &mesh, color_disp_x);
+    frame_mesh_recolor(&frame, &mesh, color_disp_y);
+    //frame_mesh_recolor(&frame, &mesh, color_parallel_multicolor);
+
     create_model_from_mesh(&mesh, &model);
 
     // Render the frame with color coded displacement

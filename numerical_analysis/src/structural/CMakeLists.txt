@@ -6,6 +6,8 @@ target_sources(${MAIN_TARGET_NAME}
         frame.c
         frameimport.h
         frameimport.c
+        frameprocess.h
+        frameprocess.c
 )
 
 target_include_directories(${MAIN_TARGET_NAME}
