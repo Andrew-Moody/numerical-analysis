@@ -31,7 +31,8 @@ int solve_equations_mpi(struct EquationSet* eqset, int iterations)
     int procs = get_procs_mpi();
     int root = get_main_mpi();
 
-    int print = rank == 1;
+    //int print = rank == 1;
+    int print = 0;
 
     // Note only the root process has any memory allocated in the eqset
     // at the start and the vector/matrix dimensions are not set
@@ -135,7 +136,7 @@ int solve_equations_mpi(struct EquationSet* eqset, int iterations)
     // Broadcast the initial guess
     MPI_Bcast(prev_x, vec_size, MPI_FLOAT, get_main_mpi(), MPI_COMM_WORLD);
 
-    struct EquationChunk chunk = { stiff_chunk, force_chunk, prev_x, curr_x, chunk_size, vec_size };
+    struct EquationChunk chunk = { stiff_chunk, force_chunk, prev_x, curr_x, chunk_size, vec_size, rank };
 
     for (int t = 0; t < iterations; ++t)
     {

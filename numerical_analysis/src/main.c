@@ -17,16 +17,25 @@
 
 int main(int argc, char* argv[])
 {
+#if ENABLE_MPI
     initialize_mpi(&argc, &argv);
     int rank = get_rank_mpi();
     int procs = get_procs_mpi();
     int main_proc = get_main_mpi();
-    int iterations = 100;
+#else
+    int rank = 0;
+    int procs = 0;
+    int main_proc = 0;
+#endif
+
+    int iterations = 9;
 
     // If MPI is enabled and multiple processes are being used
     // only the main process does anything more than participate in solving
     if (ENABLE_MPI && procs != 1 && rank != main_proc)
     {
+        //struct EquationSet eqset = {};
+        //solve_equations_mpi(&eqset, iterations);
         solve_equations_mpi(NULL, iterations);
         finalize_mpi(0);
         return 0;
@@ -34,7 +43,7 @@ int main(int argc, char* argv[])
 
 
     // Specify filepaths relative to [repository]/models/
-    const char* filename = "car.frame";
+    const char* filename = "grid2.frame";
 
     // Load nodes, elements and boundary conditions from file
     struct Frame frame;
@@ -44,11 +53,32 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    frame_preprocess(&frame);
+    // Assign nodes a group color such that neighbors are never in the same group
+    frame_assign_multicolor(&frame);
 
     // Produce the set of matrices and vectors representing the problem
     struct EquationSet eqset;
     frame_build_equations(&frame, &eqset);
+
+    for (int j = 0; j < eqset.stiffness.rows; ++j)
+    {
+        for (int i = 0; i < eqset.stiffness.cols; ++i)
+        {
+            float stiffness = eqset.stiffness.elements[i + j * eqset.stiffness.cols];
+            char symbol = '_';
+            if (stiffness != 0.0f)
+            {
+                symbol = 'k';
+            }
+
+            printf("%c ", symbol);
+        }
+
+        printf("\n");
+    }
+
+    printf("\n");
+
 
     // Create space to hold the residuals
     struct vecf residuals;
@@ -61,22 +91,19 @@ int main(int argc, char* argv[])
     // Solve Equations
     if (!ENABLE_MPI || procs == 1)
     {
-        // There is only one process so just solve directly
-        //solve_jacobi_single(eqset, residuals.elements, iterations);
+        // There is only one process so solve directly
+        solve_jacobi_single(eqset, residuals.elements, iterations);
 
+        // Parallel Jacobi using OpenMP
         //solve_jacobi_parallel(eqset, residuals.elements, iterations, 8);
 
-        solve_sor_single(eqset, residuals.elements, iterations, 1.1f);
-
-        /* for (int i = 0; i < iterations; ++i)
-        {
-            printf("%d: %f\n", i, residuals.elements[i]);
-        } */
+        //solve_sor_single(eqset, residuals.elements, iterations, 1.1f);
     }
     else
     {
         // Solve using MPI (See linsolvempi.h/c)
-        // Still in development
+        // Only uses Jacobi which has convergence problems
+        // but does get the same result as single thread
         solve_equations_mpi(&eqset, iterations);
     }
 
@@ -91,8 +118,6 @@ int main(int argc, char* argv[])
 
     //frame_print_results(&frame);
 
-    // Old method with OpenMP where everything is encapsulated
-    //frame_solve(&frame);
 
     // Must be called to initialize openGL before models can be created
     struct GLFWwindow* window;
@@ -104,12 +129,12 @@ int main(int argc, char* argv[])
     frame_create_mesh(&frame, &mesh);
 
     //frame_mesh_recolor(&frame, &mesh, color_disp_x);
-    frame_mesh_recolor(&frame, &mesh, color_disp_y);
-    //frame_mesh_recolor(&frame, &mesh, color_parallel_multicolor);
+    //frame_mesh_recolor(&frame, &mesh, color_disp_y);
+    frame_mesh_recolor(&frame, &mesh, color_parallel_multicolor);
 
     create_model_from_mesh(&mesh, &model);
 
-    // Render the frame with color coded displacement
+    // Render the frame
     render_model(window, &model);
 
     // Cleanup

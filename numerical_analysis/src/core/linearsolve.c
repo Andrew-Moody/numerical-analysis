@@ -5,12 +5,12 @@
 
 #include "frame.h"
 
-#define PRINT_DEBUG 1
+#define PRINT_DEBUG 0
 
 #if PRINT_DEBUG
 #define DLOG(...) (printf(__VA_ARGS__))
 #else
-#define DLOG(X)
+#define DLOG(...)
 #endif
 
 
@@ -330,6 +330,8 @@ void update_chunk_jacobi(struct EquationChunk chunk)
         x = chunk.vector_b[j] - x;
 
         DLOG("F-Sum: %f, ", x);
+
+        DLOG("Offset: %d, ", chunk.id * chunk.rows);
 
         // divide by the corresponding diagonal A_jj that was skipped in summation
         float a_jj = chunk.matrix_a[j + j * chunk.cols + chunk.id * chunk.rows];

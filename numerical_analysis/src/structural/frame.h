@@ -92,6 +92,8 @@ void frame_mesh_recolor(const struct Frame* frame, struct Mesh* mesh, color_func
 
 void equationset_release(struct EquationSet* eqset);
 
+void equationset_print(struct EquationSet* eqset);
+
 void frame_print_results(struct Frame* frame);
 
 // Solve the linear equation representing the frame using an iterative method with OpenMP

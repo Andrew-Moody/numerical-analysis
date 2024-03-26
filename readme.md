@@ -14,8 +14,7 @@ Successive Over-relaxation (and Gauss-Seidel) increases convergence rate by usin
 
 Nodes grouped into independent "color" sets
 
-At the moment I have Jacobi and Successive Over-relaxation both implemented with single threading as well as Jacobi implemented with multiple threads/processes using OpenMP. I am currently working on adding MPI support and implementing a multicolor SOR method to allow parallel SOR and have a working color assignment so far.
-Unfortunately, Jacobi does not converge for the FSAE car frame example. I am still investigating if this is a consequence of the frame geometry itself or poor boundary conditions. The post boundary condition stiffness matrix is neither strong, weak, nor irreducibly diagonally dominant so neither Jacobi nor SOR are guaranteed to converge. I have not checked the spectral radius but given Jacobi does not converge we can conclude it is >= 1.
+At the moment I have Jacobi and Successive Over-relaxation both implemented with single threading as well as Jacobi implemented with multiple threads/processes using OpenMP and MPI. I am currently working on a multicolor SOR method to allow parallel SOR. Unfortunately, Jacobi does not converge for the FSAE car frame example. I am still investigating if this is a consequence of the frame geometry itself or poor boundary conditions. The post boundary condition stiffness matrix is neither strong, weak, nor irreducibly diagonally dominant so neither Jacobi nor SOR are guaranteed to converge. I have not checked the spectral radius but given Jacobi does not converge we can conclude it is >= 1.
 
 ### Dependencies and Build instructions
 This project has currently only been tested on WSL Ubuntu but I will be trying to test on other distributions and potentially adding a windows version as well.
@@ -31,13 +30,12 @@ This project has currently only been tested on WSL Ubuntu but I will be trying t
     cd [repo location]/build/numerical_analysis
     ./numerical_analysis
 
-By default MPI is disabled and is still experimental. If your system supports MPI and you want to enable it you will need to pass a flag to the cmake command
+Run with MPI
 
+    cd [repo location]/build
     cmake ../ -DENABLE_MPI=true
-
-Then to run with multiple processes you have to run with an MPI command
-
-    mpirun -n [number of processes]
+    cd [repo location]/build/numerical_analysis
+    mpirun -n [number of processes] numerical_analysis
 
 #### More Details
 Ubuntu comes with gcc which should support OpenMP out of the box. You just need to have the -fopenmp compiler flag set which should be handled correctly with the provided CMake files.
@@ -74,3 +72,12 @@ And finally, to run the resulting executable you will need to first navigate to 
 
     cd <repo>/build/numerical_analysis
     ./numerical_analysis
+
+
+By default MPI is disabled and is still experimental. If your system supports MPI and you want to enable it you will need to pass a flag to the cmake command
+
+    cmake ../ -DENABLE_MPI=true
+
+Instead of running the executable normally you have to run with an MPI command specifying the number of processes to launch
+
+    mpirun -n [number of processes] numerical_analysis

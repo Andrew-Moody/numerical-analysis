@@ -9,6 +9,8 @@
 #include "linearsolve.h"
 #include "mesh.h"
 
+#include "frameprocess.h"
+
 // Degrees of freedom (3 translation and 3 rotation)
 #define DOF 6
 
@@ -594,33 +596,33 @@ void frame_print_results(struct Frame* frame)
             node->moment.z
         );
     }
+}
 
-    // More for printing the equation set
-    /* for (int n = 0; n < frame->node_count; ++n)
-    {
-        printf("Node %i Displacement: (%2.3f, %2.3f, %2.3f), Rotation: (%2.3f, %2.3f, %2.3f)\n", n,
-            displacements->elements[n * DOF],
-            displacements->elements[n * DOF + 1],
-            displacements->elements[n * DOF + 2],
-            displacements->elements[n * DOF + 3],
-            displacements->elements[n * DOF + 4],
-            displacements->elements[n * DOF + 5]
-        );
-    }
-
+void equationset_print(struct EquationSet* eqset)
+{
+    printf("\n");
+    matrix_print(eqset->stiff_bc);
     printf("\n");
 
-    for (int n = 0; n < frame->node_count; ++n)
+
+    for (int n = 0; n < eqset->displacements.count / 6; ++n)
     {
-        printf("Node %i Force: (%2.3f, %2.3f, %2.3f), Moment: (%2.3f, %2.3f, %2.3f)\n", n,
-            forces->elements[n * DOF],
-            forces->elements[n * DOF + 1],
-            forces->elements[n * DOF + 2],
-            forces->elements[n * DOF + 3],
-            forces->elements[n * DOF + 4],
-            forces->elements[n * DOF + 5]
+        printf("Node %i Displacement: (%2.3f, %2.3f, %2.3f), Rotation: (%2.3f, %2.3f, %2.3f), "
+            "Force: (% 2.3f, % 2.3f, % 2.3f), Moment: (% 2.3f, % 2.3f, % 2.3f)\n", n,
+            eqset->displacements.elements[n * DOF],
+            eqset->displacements.elements[n * DOF + 1],
+            eqset->displacements.elements[n * DOF + 2],
+            eqset->displacements.elements[n * DOF + 3],
+            eqset->displacements.elements[n * DOF + 4],
+            eqset->displacements.elements[n * DOF + 5],
+            eqset->forces.elements[n * DOF],
+            eqset->forces.elements[n * DOF + 1],
+            eqset->forces.elements[n * DOF + 2],
+            eqset->forces.elements[n * DOF + 3],
+            eqset->forces.elements[n * DOF + 4],
+            eqset->forces.elements[n * DOF + 5]
         );
-    } */
+    }
 }
 
 void frame_solve(struct Frame* frame)
@@ -638,6 +640,10 @@ void frame_solve(struct Frame* frame)
 
     // Populate per node properties using displacements to back calculate forces
     frame_update_results(frame, &eqset);
+
+    printf("\n");
+    equationset_print(&eqset);
+    printf("\n");
 
     // Print Node displacments and forces
     frame_print_results(frame);
@@ -690,8 +696,8 @@ void color_parallel_multicolor(struct Vertex* vertex, struct Node* node)
         vertex->b = 1.0f;
         break;
     case 4:
-        vertex->r = 1.0f;
-        vertex->g = 1.1f;
+        vertex->r = 0.0f;
+        vertex->g = 0.1f;
         vertex->b = 0.5f;
         break;
     case 5:
@@ -711,8 +717,8 @@ void color_parallel_multicolor(struct Vertex* vertex, struct Node* node)
         break;
     case 8:
         vertex->r = 1.0f;
-        vertex->g = 1.0f;
-        vertex->b = 1.0f;
+        vertex->g = 0.0f;
+        vertex->b = 0.0f;
         break;
     default:
         vertex->r = 0.0f;
