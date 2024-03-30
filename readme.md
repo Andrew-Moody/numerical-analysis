@@ -24,6 +24,8 @@ This project has currently only been tested on WSL Ubuntu but I will be trying t
     sudo apt install cmake  
     sudo apt install mesa-utils  
     git clone --recurse-submodules https://github.com/Andrew-Moody/numerical-analysis.git
+    cd [repo location]
+    mkdir build
     cd [repo location]/build
     cmake ../
     cmake --build [repo location]/build
@@ -32,8 +34,9 @@ This project has currently only been tested on WSL Ubuntu but I will be trying t
 
 Run with MPI
 
-    cd [repo location]/build
+    Follow the steps above but add a flag when running cmake to enable MPI and run with an mpi command to get multiple processes
     cmake ../ -DENABLE_MPI=true
+    cmake --build [repo location]/build
     cd [repo location]/build/numerical_analysis
     mpirun -n [number of processes] numerical_analysis
 
@@ -55,20 +58,23 @@ The rest of the dependencies are included as submodules and built during the sam
 
 For the curious the included dependencies are: GLFW, GLAD, and Assimp. GLAD doesn't actually have a repo that can be submoduled you just generate files for your configuration using a web based tool. I've included a set of generated files with the required license. Hopefully there aren't any issues caused by incompatible configurations.
 
-Next you will need to configure for building using CMake. We need to tell CMake where to look for files and where to output results. The simple way is to first navigate to the build folder located under the repo folder. from there execute the cmake command using the parent folder as the argument (../) which tells CMake to look in the repo folder (one directory up from current) and place configuration output in build (the current directory). [repo] is the path to the cloned repository (should be named numerical_analysis by default)
+Next you will need to configure for building using CMake. We then need to tell CMake where to look for files and where to output results.
+You have the option to specify the build location, I recommend adding a build directory under the repo directory (the build directory is ignored by version control otherwise there would be one already). You then execute the cmake command from your build directory passing the source directory as the argument. if you placed the build directory under the repo directory then the source directory is the parent so you can use the cmake command while inside the build directory using the parent directory as the argument (../) to tell CMake to look in the repo folder (one directory up from current) and place configuration output in build (the current directory). [repo] is the path to the cloned repository (named numerical_analysis by default)
 
+    cd [repo]
+    mkdir build
     cd [repo]/build
     cmake ../
 
-If this is confusing the following command works without having to be in a specific directory first.
+If this is confusing the following command works without having to be in a specific directory first. (though you still need to create a build directory somewhere first)
 
-    cmake -B [repo]/build -S [repo]
+    cmake -B [build path] -S [repo path]
 
 Now you can actually build the project using make from the build directory (or use cmake --build [path to build directory]). It might take a bit of time to build the first time due to Assimp's size.
 
     cmake --build [repo]/build
 
-And finally, to run the resulting executable you will need to first navigate to the folder it was built into otherwise file paths will not work correctly (looking for a work around for this).
+And finally, run the resulting executable found in build/numerical_analysis/
 
     cd <repo>/build/numerical_analysis
     ./numerical_analysis
