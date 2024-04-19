@@ -5,15 +5,23 @@ project(numerical_analysis VERSION 1.0 LANGUAGES C CXX)
 # Allow organization of targets into "folders" for Visual Studio
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
-
+# Build libraries as shared to allow calling from Python
+option(BUILD_SHARED_LIBS "Build shared libraries" ON)
+message("BUILD_SHARED_LIBS:" ${BUILD_SHARED_LIBS})
 
 # Add the main target
-set(MAIN_TARGET_NAME "numerical_analysis")
-add_executable(${MAIN_TARGET_NAME} "")
+set(MAIN_TARGET_NAME "numerical_analysis_library")
+add_library(${MAIN_TARGET_NAME} "")
 # Since the target is added here instead of in the numerical_analysis subdirectory
-# the output directory must be set to keep the executable under numerical_analysis
+# the output directory must be set to keep the executable and/or library under numerical_analysis
 set_target_properties(${MAIN_TARGET_NAME} PROPERTIES RUNTIME_OUTPUT_DIRECTORY numerical_analysis)
 
+# Add the test target
+set(TEST_TARGET_NAME "numerical_analysis")
+add_executable(${TEST_TARGET_NAME} "")
+# Since the target is added here instead of in the numerical_analysis subdirectory
+# the output directory must be set to keep the executable and/or library under numerical_analysis
+set_target_properties(${TEST_TARGET_NAME} PROPERTIES RUNTIME_OUTPUT_DIRECTORY numerical_analysis)
 
 
 # Dependencies that must be installed
@@ -32,6 +40,12 @@ target_link_libraries(${MAIN_TARGET_NAME}
         glfw
         assimp
         OpenMP::OpenMP_C
+)
+
+# Linking Dependencies
+target_link_libraries(${TEST_TARGET_NAME}
+    PRIVATE
+        ${MAIN_TARGET_NAME}
 )
 
 

@@ -14,6 +14,8 @@ target_sources(${MAIN_TARGET_NAME}
         mpiutility.c
         linsolvempi.h
         linsolvempi.c
+        api.h
+        api.c
 )
 
 target_include_directories(${MAIN_TARGET_NAME}

@@ -11,13 +11,13 @@
 int frame_import(const char* filename, struct Frame* frame)
 {
     // Get the full filepath looking for a file (or filepath) relative to repo/models/
-    char* path = get_full_filepath(filename, "models/");
+    //char* path = get_full_filepath(filename, "models/");
 
     // Typical file handling
-    FILE* file = fopen(path, "r");
+    FILE* file = fopen(filename, "r");
 
     // Free the path string regardless of success 
-    free(path);
+    //free(path);
 
     if (!file)
     {

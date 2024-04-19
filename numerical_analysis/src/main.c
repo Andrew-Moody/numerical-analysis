@@ -8,6 +8,7 @@
 #include "model.h"
 #include "frameimport.h"
 #include "frameprocess.h"
+#include "filepath.h"
 
 #include "mpiutility.h"
 #include "mpitest.h"
@@ -43,11 +44,16 @@ int main(int argc, char* argv[])
 
 
     // Specify filepaths relative to [repository]/models/
-    const char* filename = "grid2.frame";
+    const char* filename = "car.frame";
+    char* filepath = get_full_filepath(filename, "models/");
 
     // Load nodes, elements and boundary conditions from file
     struct Frame frame;
-    if (frame_import(filename, &frame))
+    int load_failed = frame_import(filepath, &frame);
+
+    free(filepath);
+
+    if (load_failed)
     {
         finalize_mpi(0);
         return 1;
@@ -117,7 +123,6 @@ int main(int argc, char* argv[])
     equationset_release(&eqset);
 
     //frame_print_results(&frame);
-
 
     // Must be called to initialize openGL before models can be created
     struct GLFWwindow* window;
